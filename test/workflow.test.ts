@@ -47,6 +47,7 @@ data.doctors = [
   { slug: 'a', name: 'Dr. A One', qualification: 'MBBS', speciality: 'Cardiology', department: 'cardiology', bio: '' },
   { slug: 'b', name: 'Dr. B Two', qualification: 'MS', speciality: 'Orthopaedics', department: 'joint-replacement', bio: '' },
   { slug: 'c', name: 'Dr. C Three', qualification: '', speciality: '', department: '', bio: '' },
+  { slug: 'd', name: 'Dr. D Four', qualification: 'BPT', speciality: 'Physiotherapist', department: '', bio: '', spotlight: false },
 ];
 setHospitalData(data);
 
@@ -79,7 +80,7 @@ async function csrf(path = '/'): Promise<string> {
   return m[1];
 }
 
-test('rotation goes doctor → department → doctor → department → hospital, skipping doctors without a speciality', async () => {
+test('rotation goes doctor → department → doctor → department → hospital, skipping doctors without a speciality or with spotlight: false', async () => {
   const kinds = [];
   const subjects = [];
   for (let i = 0; i < 6; i++) {

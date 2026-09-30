@@ -20,6 +20,8 @@ export interface Doctor {
   speciality: string;
   department: string;
   bio: string;
+  /** false = listed (e.g. for department posts and Google profile matching) but never spotlighted on its own */
+  spotlight?: boolean;
 }
 
 export interface HospitalData {
@@ -64,7 +66,7 @@ export function doctorsInDepartment(slug: string): Doctor[] {
 
 /** Doctors with enough facts for Gemini to write about without inventing anything. */
 export function spotlightDoctors(): Doctor[] {
-  return loadHospital().doctors.filter((d) => d.speciality.trim() !== '');
+  return loadHospital().doctors.filter((d) => d.speciality.trim() !== '' && d.spotlight !== false);
 }
 
 export function postableDepartments(): Department[] {

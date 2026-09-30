@@ -170,11 +170,13 @@ npm test                    # tests never touch real accounts: they blank every 
 
 ## Setup checklist
 
-### 1. Fill in `data/hospital.json` (required for good posts)
-Only 7 doctors' names are in the file so far, and none have a speciality yet. **A doctor is only
-spotlighted once `speciality` is filled in**, because Gemini must not invent qualifications or
-experience. Add all 15 doctors (name, qualification, speciality, department, a one-line bio) and
-check the department briefs and hospital facts. Add photos to `social-images/`.
+### 1. Check `data/hospital.json` and add photos
+The file lists 17 doctors, 2 physiotherapists and a dietitian with their qualifications,
+specialities, departments and experience. The source is the Drive sheet "CHETNA HOSPITAL DOCTORS"
+(Jan 2026), plus the hospital website for Dr. Hemant C. Patil. **Gemini may only use what is written
+here**, so keep it up to date when doctors join or leave. People marked `"spotlight": false`
+(physiotherapists, dietitian) appear in department posts but don't get their own spotlight post.
+Add photos to `social-images/` as `doctor-<slug>.jpg`.
 
 ### 2. Facebook & Instagram (about 15 minutes, free)
 1. In the Instagram app: switch the account to **Professional (Business)** and link it to the
