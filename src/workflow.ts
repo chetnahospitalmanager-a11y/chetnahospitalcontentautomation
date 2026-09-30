@@ -2,7 +2,8 @@ import { bookingLink, config, gbpEnabled, instagramEnabled, metaEnabled } from '
 import { gbpSummary, reviseCaption, socialCaption, writeCaption } from './captions.ts';
 import { complianceWarnings } from './compliance.ts';
 import { getPost, insertPost, listPosts, transitionPost, updatePost, type Post, type PublishResult } from './db.ts';
-import { doctorsInDepartment, findDoctor } from './hospital.ts';
+import { doctorsInDepartment, findDoctor, type Doctor } from './hospital.ts';
+import { doctorPagesEnabled, getDoctorPages } from './publishers/metaPages.ts';
 import { sendAlert } from './notify.ts';
 import { postToFacebook, postToInstagram } from './publishers/meta.ts';
 import { createLocalPost, getMatch } from './publishers/gbp.ts';
@@ -72,14 +73,19 @@ async function mustBeDraft(id: number): Promise<Post> {
   return post;
 }
 
+/** The doctors a post is about: the spotlighted doctor, or everyone in the department. */
+export function doctorsForPost(post: Pick<Post, 'kind' | 'subject'>): Doctor[] {
+  if (post.kind === 'doctor') return [findDoctor(post.subject)].filter((d) => d !== undefined);
+  if (post.kind === 'department') return doctorsInDepartment(post.subject);
+  return [];
+}
+
 /** Google profiles a post goes to: always the hospital, plus the doctors it is about. */
 export async function gbpLocationsFor(post: Pick<Post, 'kind' | 'subject'>): Promise<{ loc: GbpLocation; doctorName?: string }[]> {
   const match = await getMatch();
   const out: { loc: GbpLocation; doctorName?: string }[] = [];
   if (match.hospital) out.push({ loc: match.hospital });
-  const doctors =
-    post.kind === 'doctor' ? [findDoctor(post.subject)].filter((d) => d !== undefined) : post.kind === 'department' ? doctorsInDepartment(post.subject) : [];
-  for (const d of doctors) {
+  for (const d of doctorsForPost(post)) {
     const loc = match.byDoctor.get(d.slug);
     if (loc) out.push({ loc, doctorName: d.name });
   }
@@ -91,6 +97,28 @@ export async function planTargets(post: Post): Promise<Target[]> {
   const social = socialCaption(post.caption);
   if (metaEnabled()) targets.push({ channel: 'facebook', run: (img) => postToFacebook(img, social) });
   if (instagramEnabled()) targets.push({ channel: 'instagram', run: (img) => postToInstagram(img, social) });
+  // Doctors' own Facebook Pages / Instagram accounts, found through the system user.
+  const doctors = doctorsForPost(post);
+  if (metaEnabled() && doctorPagesEnabled() && doctors.length) {
+    try {
+      const pages = await getDoctorPages();
+      for (const d of doctors) {
+        const acc = pages.byDoctor.get(d.slug);
+        if (!acc || !acc.token) continue;
+        targets.push({ channel: `facebook:${acc.pageName}`, run: (img) => postToFacebook(img, social, { pageId: acc.pageId, token: acc.token }) });
+        if (acc.igUserId) {
+          targets.push({
+            channel: `instagram:${acc.igUsername ? `@${acc.igUsername}` : acc.pageName}`,
+            run: (img) => postToInstagram(img, social, { igUserId: acc.igUserId!, token: acc.token }),
+          });
+        }
+      }
+    } catch (err) {
+      // Don't hold back the hospital's own posts; show the problem as a failed channel that can be retried.
+      const message = (err as Error).message;
+      targets.push({ channel: 'facebook:doctor pages', run: async () => Promise.reject(new Error(`Could not load doctors' Pages: ${message}`)) });
+    }
+  }
   if (gbpEnabled()) {
     const summary = gbpSummary(post.caption);
     for (const { loc, doctorName } of await gbpLocationsFor(post)) {

@@ -1,8 +1,13 @@
 import { config } from '../config.ts';
 
-export async function graph(path: string, params: Record<string, string>, method: 'GET' | 'POST' = 'POST'): Promise<Record<string, unknown>> {
+export async function graph(
+  path: string,
+  params: Record<string, string>,
+  method: 'GET' | 'POST' = 'POST',
+  token: string = config.metaPageAccessToken,
+): Promise<Record<string, unknown>> {
   const url = new URL(`https://graph.facebook.com/${config.metaGraphVersion}/${path}`);
-  const body = new URLSearchParams({ ...params, access_token: config.metaPageAccessToken });
+  const body = new URLSearchParams({ ...params, access_token: token });
   let res: Response;
   if (method === 'GET') {
     body.forEach((v, k) => url.searchParams.set(k, v));
@@ -17,24 +22,27 @@ export async function graph(path: string, params: Record<string, string>, method
   return json;
 }
 
-/** Photo post on the Facebook Page. Returns the post id. */
-export async function postToFacebook(imageUrl: string, caption: string): Promise<string> {
-  const r = await graph(`${config.metaPageId}/photos`, { url: imageUrl, message: caption, published: 'true' });
+/** Photo post on a Facebook Page (the hospital's unless another page and its token are given). Returns the post id. */
+export async function postToFacebook(imageUrl: string, caption: string, page?: { pageId: string; token: string }): Promise<string> {
+  const pageId = page?.pageId ?? config.metaPageId;
+  const r = await graph(`${pageId}/photos`, { url: imageUrl, message: caption, published: 'true' }, 'POST', page?.token);
   return String(r.post_id ?? r.id);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Instagram publishing is two steps: create a media container, wait until Instagram has fetched the image, then publish. */
-export async function postToInstagram(imageUrl: string, caption: string): Promise<string> {
-  const container = await graph(`${config.metaIgUserId}/media`, { image_url: imageUrl, caption });
+export async function postToInstagram(imageUrl: string, caption: string, account?: { igUserId: string; token: string }): Promise<string> {
+  const igUserId = account?.igUserId ?? config.metaIgUserId;
+  const token = account?.token;
+  const container = await graph(`${igUserId}/media`, { image_url: imageUrl, caption }, 'POST', token);
   const creationId = String(container.id);
   for (let i = 0; i < 15; i++) {
-    const s = await graph(creationId, { fields: 'status_code' }, 'GET');
+    const s = await graph(creationId, { fields: 'status_code' }, 'GET', token);
     if (s.status_code === 'FINISHED') break;
     if (s.status_code === 'ERROR' || s.status_code === 'EXPIRED') throw new Error(`Instagram container ${s.status_code}`);
     await sleep(2000);
   }
-  const published = await graph(`${config.metaIgUserId}/media_publish`, { creation_id: creationId });
+  const published = await graph(`${igUserId}/media_publish`, { creation_id: creationId }, 'POST', token);
   return String(published.id);
 }

@@ -1,10 +1,14 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { config, gbpEnabled, metaEnabled } from '../config.ts';
+import { config, gbpEnabled, instagramEnabled, metaEnabled } from '../config.ts';
 import { getComment, getKv, getPost, getReport, getReview, listCommentRows, listPosts, listReports, listReviewRows, type PostKind } from '../db.ts';
 import { draftReply, postReply, reviseReply, saveReply, skipReview, syncReviews, type SyncSummary } from '../reviews.ts';
 import { reviewsPage } from './reviewViews.ts';
 import { insightsPage } from './insightViews.ts';
 import { commentsPage } from './commentViews.ts';
+import { connectionsPage, type ConnectionsInfo } from './connectionsView.ts';
+import { doctorPagesEnabled, getDoctorPages } from '../publishers/metaPages.ts';
+import { graph } from '../publishers/meta.ts';
+import { loadHospital } from '../hospital.ts';
 import {
   draftCommentReply,
   hideCommentById,
@@ -375,6 +379,51 @@ export function createApp() {
       if (r?.warnings.length && req.body.confirm !== 'yes') throw new Error('Tick "I have checked the wording" first');
       const after = await postReply(id);
       return after.status === 'replied' ? 'replied' : 'reply_failed';
+    }),
+  );
+
+  // ---------------------------------------------------------------- Connected accounts (read-only check)
+
+  app.get(
+    '/connections',
+    wrap(async (_req, res) => {
+      const info: ConnectionsInfo = {
+        hospital: { facebook: null, instagram: null },
+        doctors: [],
+        doctorPagesEnabled: doctorPagesEnabled(),
+        problems: [],
+      };
+      if (metaEnabled()) {
+        try {
+          const p = (await graph(config.metaPageId, { fields: 'name,instagram_business_account{username}' }, 'GET')) as {
+            name?: string;
+            instagram_business_account?: { id: string; username?: string };
+          };
+          info.hospital.facebook = `${p.name ?? config.metaPageId} (${config.metaPageId})`;
+          if (instagramEnabled()) {
+            const linked = p.instagram_business_account;
+            info.hospital.instagram = linked?.id === config.metaIgUserId ? `@${linked.username ?? linked.id}` : `account ${config.metaIgUserId}`;
+            if (linked && linked.id !== config.metaIgUserId) info.problems.push('META_IG_USER_ID is not the Instagram account linked to the hospital Page');
+          }
+        } catch (err) {
+          info.hospital.error = `Could not read the hospital Page: ${(err as Error).message}`;
+        }
+      } else {
+        info.hospital.error = 'Facebook is not connected (META_PAGE_ID / META_PAGE_ACCESS_TOKEN).';
+      }
+      if (info.doctorPagesEnabled) {
+        try {
+          const pages = await getDoctorPages(true);
+          for (const d of loadHospital().doctors) {
+            const acc = pages.byDoctor.get(d.slug);
+            if (acc) info.doctors.push({ doctor: d.name, facebook: acc.pageName, instagram: acc.igUsername ? `@${acc.igUsername}` : acc.igUserId });
+          }
+          info.problems.push(...pages.problems);
+        } catch (err) {
+          info.problems.push(`Could not list the system user's Pages: ${(err as Error).message}`);
+        }
+      }
+      res.send(connectionsPage(info));
     }),
   );
 

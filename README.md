@@ -196,6 +196,22 @@ Add photos to `social-images/` as `doctor-<slug>.jpg`.
 
 You are an admin of your own Page, so posting to it works without Meta's full app review.
 
+### 2b. Doctors' own Facebook Pages and Instagram (optional)
+A doctor spotlight can also go to that doctor's own Facebook Page and linked Instagram account, and a
+department post to the Pages of the doctors in it. Hospital-wide posts stay on the hospital Page only.
+1. In Business settings, make sure each doctor's Page is in the hospital's business portfolio and each
+   doctor's Instagram is linked to their Page.
+2. Give the portfolio's **system user** full control of those Pages and Instagram accounts, and a role
+   on the app.
+3. Generate a system-user token for the app (expiry **Never**, the same 11 permissions) and set it on
+   Render as `META_SYSTEM_USER_TOKEN`.
+4. Open the **Connections** page. It lists which Page and Instagram account each doctor matched. Pages are
+   matched by name (like the Google profiles), using the doctor's name or an `aliases` entry in
+   `data/hospital.json`; set `facebookPageId` on a doctor to pin a Page exactly. The approval page also
+   lists every Page a draft will go to before you approve it.
+
+Comments and the weekly report still cover the hospital's own Page and Instagram only.
+
 ### 3. Google Business Profiles (14 profiles, 1 Gmail)
 1. **Request API access first; it can take weeks.** Search for "Business Profile API access
    request" (linked from the API's *Prerequisites* page). Use the Google Cloud project number and the

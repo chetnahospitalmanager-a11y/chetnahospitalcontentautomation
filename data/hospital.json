@@ -133,7 +133,10 @@
       "qualification": "MBBS, MS (Ophthalmology), FCRS ICO (UK)",
       "speciality": "Ophthalmologist and Phaco Refractive Surgeon",
       "department": "ophthalmology",
-      "bio": "10 years of experience."
+      "bio": "10 years of experience.",
+      "aliases": [
+        "Dr. Rachana Tiwari"
+      ]
     },
     {
       "slug": "aishwarya-patil-pethe",
@@ -141,7 +144,10 @@
       "qualification": "MBBS, MD (Dermatology)",
       "speciality": "Dermatologist, Trichologist and Dermato-Surgeon",
       "department": "dermatology",
-      "bio": "8 years of experience."
+      "bio": "8 years of experience.",
+      "aliases": [
+        "Dr. Aishwarya Patil"
+      ]
     },
     {
       "slug": "ashpak-bangi",

@@ -2,6 +2,13 @@ import type { Post } from '../db.ts';
 import { gbpSummary, socialCaption } from '../captions.ts';
 import { loadHospital, postableDepartments, spotlightDoctors } from '../hospital.ts';
 
+/** "facebook" → "Facebook (hospital)", "gbp:Dr. X" → "Google: Dr. X", "instagram:@x" → "Instagram: @x" */
+export function channelLabel(c: string): string {
+  if (c === 'facebook') return 'Facebook (hospital)';
+  if (c === 'instagram') return 'Instagram (hospital)';
+  return c.replace(/^gbp:/, 'Google: ').replace(/^facebook:/, 'Facebook: ').replace(/^instagram:/, 'Instagram: ');
+}
+
 export function esc(s: unknown): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
@@ -47,7 +54,7 @@ ul{padding-left:20px;margin:6px 0}table{width:100%;border-collapse:collapse}td,t
 details summary{cursor:pointer;color:var(--brand);font-weight:600}
 @media(max-width:480px){header .brand{display:none}header{gap:8px}}
 </style></head><body>
-<header><nav style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><a href="/" class="brand">Chetna Social</a>${opts.loggedIn ? '<a href="/" style="font-weight:400">Posts</a><a href="/reviews" style="font-weight:400">Reviews</a><a href="/comments" style="font-weight:400">Comments</a><a href="/insights" style="font-weight:400">Insights</a>' : ''}</nav>${opts.loggedIn ? '<form method="post" action="/logout" style="margin:0"><button style="padding:4px 10px">Log out</button></form>' : ''}</header>
+<header><nav style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><a href="/" class="brand">Chetna Social</a>${opts.loggedIn ? '<a href="/" style="font-weight:400">Posts</a><a href="/reviews" style="font-weight:400">Reviews</a><a href="/comments" style="font-weight:400">Comments</a><a href="/insights" style="font-weight:400">Insights</a><a href="/connections" style="font-weight:400">Connections</a>' : ''}</nav>${opts.loggedIn ? '<form method="post" action="/logout" style="margin:0"><button style="padding:4px 10px">Log out</button></form>' : ''}</header>
 <main>${body}</main></body></html>`;
 }
 
@@ -116,12 +123,12 @@ export function postPage(opts: { post: Post; channels: string[]; notes: string[]
     : '';
 
   const targets = `<h2>Will post to</h2>${
-    opts.channels.length ? `<ul>${opts.channels.map((c) => `<li>${esc(c.replace(/^gbp:/, 'Google: '))}</li>`).join('')}</ul>` : '<p class="muted">No channels connected yet.</p>'
+    opts.channels.length ? `<ul>${opts.channels.map((c) => `<li>${esc(channelLabel(c))}</li>`).join('')}</ul>` : '<p class="muted">No channels connected yet.</p>'
   }${opts.notes.length ? `<ul class="muted">${opts.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}`;
 
   const results = post.results.length
     ? `<div class="card"><h2>Publishing results</h2><table>${post.results
-        .map((r) => `<tr><td>${esc(r.channel.replace(/^gbp:/, 'Google: '))}</td><td>${r.ok ? '✅ Posted' : `❌ ${esc(r.error)}`}</td></tr>`)
+        .map((r) => `<tr><td>${esc(channelLabel(r.channel))}</td><td>${r.ok ? '✅ Posted' : `❌ ${esc(r.error)}`}</td></tr>`)
         .join('')}</table>${
         canRetry ? `<form method="post" action="/posts/${post.id}/publish">${hidden}<div class="row"><button class="primary">Retry the failed ones</button></div></form>` : ''
       }</div>`
