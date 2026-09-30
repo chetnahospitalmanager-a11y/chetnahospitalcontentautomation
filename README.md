@@ -1,6 +1,9 @@
 # Chetna Hospital: social media & Google Business Profile automation
 
-A small standalone service, separate from the WhatsApp booking bot, that:
+A small standalone service, separate from the WhatsApp booking bot, with two jobs:
+**posting** (below) and **answering Google reviews** (see [Google review replies](#google-review-replies)).
+
+For posting, it:
 
 1. **Writes a draft post** every Mon/Wed/Fri at 10:00 IST with Gemini, rotating
    doctor spotlight → department → doctor → department → hospital-wide topic.
@@ -42,6 +45,34 @@ cron (Mon/Wed/Fri 10:00 IST) or "New post" button
   matches "Dr. Aishwarya Patil Pethe" and the several Dr. Patils aren't mixed up. Anything
   ambiguous is skipped rather than guessed. Check with `npm run gbp:locations`.
 
+## Google review replies
+
+Replying to reviews consistently helps local ranking more than posting does. Every 3 hours (08:15-20:15
+IST) the service checks **all** Google profiles the account can see (including any not matched to a
+doctor) for new reviews, has Gemini draft a reply, and lists them on the **Reviews** page, lowest
+ratings first. Staff edit the reply, ask for changes, post it, or mark it "Don't reply". **Nothing is
+posted automatically.**
+
+- **Confidentiality:** replies are public, so drafts never confirm that the reviewer was a patient or
+  mention any condition, treatment, bill or visit detail, even if the reviewer did. The page flags
+  wording like "your surgery" or "our records show", plus the same NMC wording rules as posts, and asks
+  for "I have checked the wording" before posting such a reply.
+- **Complaints (1-3 stars):** the draft thanks them, apologises, says the feedback is being looked into and
+  invites them to contact the hospital. Set `REVIEW_CONTACT_LINE` to control exactly how that is phrased
+  (e.g. the front-desk number). 1-2 star reviews are highlighted in red.
+- **Only new, unanswered reviews** are picked up (last `REVIEW_MAX_AGE_DAYS`, default 60). Reviews
+  already answered on Google are ignored.
+- **Answered in the Google app meanwhile?** The next check marks it "Answered in the Google app" and it
+  can no longer be posted from here, so it never gets two replies.
+- **Reviewer edited their review?** It comes back to the Reviews page with a fresh draft and a note,
+  even if it had already been answered.
+- If Google rejects a reply, it shows the error and can be posted again (Google replaces a reply; it
+  never duplicates it).
+- Optional WhatsApp alert: "N new Google reviews to reply to", using the same WATI template as posts.
+
+It needs the same Google setup as posting (step 3 below); nothing extra. On Render's free plan, also
+add a cron-job.org job for `POST /cron/reviews` (see step 4).
+
 ### Code map
 
 | File | What it does |
@@ -55,6 +86,7 @@ cron (Mon/Wed/Fri 10:00 IST) or "New post" button
 | `src/publishers/gbp.ts`, `src/gbpMatch.ts` | Google Business Profile posts and profile ↔ doctor matching |
 | `src/workflow.ts` | Draft → approve → publish, retry of failed channels |
 | `src/web/*` | Approval page (password login, CSRF + same-origin checks) |
+| `src/reviews.ts`, `src/web/reviewViews.ts` | Review sync, reply drafts, posting replies, Reviews page |
 | `src/notify.ts` | Optional send-only WhatsApp alert through WATI |
 | `scripts/gbp-auth.mjs` | One-time Google sign-in; saves the refresh token into `.env` without printing it |
 | `scripts/gbp-locations.ts` | Read-only check of which profile matched which doctor |
@@ -117,6 +149,8 @@ You are an admin of your own Page, so posting to it works without Meta's full ap
    `CRON_SECRET` and add a free job at cron-job.org: `POST https://<your-app>/cron/draft` with
    header `x-cron-secret: <CRON_SECRET>`, Mon/Wed/Fri 10:00 IST. It won't create more than
    `MAX_PENDING_DRAFTS` waiting drafts, so the two schedules can't pile up duplicates.
+   Add a second job, `POST https://<your-app>/cron/reviews` with the same header, every 3 hours
+   during the day, so new reviews are fetched even while the service is asleep.
 
 ### 5. Optional: WhatsApp alert when a draft is ready
 Submit a WATI template `chetna_bot_social_draft_ready_mkt` with the text
@@ -128,5 +162,4 @@ messages, so it stays separate from the booking bot.
 Create one draft, approve it, and check it appears on Facebook, Instagram and the Google profiles.
 
 ## Not built yet
-- AI-drafted replies to Google reviews, approved on the same page (likely the biggest ranking win).
 - Weekly Google profile insights report (calls, directions, website clicks per profile).

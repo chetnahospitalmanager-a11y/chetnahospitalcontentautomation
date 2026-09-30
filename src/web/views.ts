@@ -13,9 +13,12 @@ const STATUS_LABEL: Record<string, string> = {
   partial: 'Partly published',
   failed: 'Failed',
   skipped: 'Skipped',
+  posting: 'Posting…',
+  replied: 'Replied',
+  replied_elsewhere: 'Answered in the Google app',
 };
 
-function layout(title: string, body: string, opts: { loggedIn?: boolean } = {}): string {
+export function layout(title: string, body: string, opts: { loggedIn?: boolean } = {}): string {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
@@ -35,14 +38,14 @@ textarea{min-height:180px}button{font:inherit;padding:10px 14px;border-radius:8p
 button.primary{background:var(--brand);color:#fff;border-color:var(--brand)}button.danger{color:var(--bad)}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.8rem;background:#e6eef0}
-.badge.published{background:#dff3e5;color:var(--ok)}.badge.failed{background:#fbe3e1;color:var(--bad)}.badge.partial{background:#fff1d6;color:var(--warn)}
+.badge.published,.badge.replied{background:#dff3e5;color:var(--ok)}.badge.failed{background:#fbe3e1;color:var(--bad)}.badge.partial{background:#fff1d6;color:var(--warn)}
 .warn{background:#fff6e0;border:1px solid #f0d49a;border-radius:8px;padding:8px 12px;color:#5c3b00}
 .err{background:#fbe3e1;border:1px solid #efb4ae;border-radius:8px;padding:8px 12px;color:#6d130d}
 pre{white-space:pre-wrap;word-break:break-word;background:#f7fafa;border:1px solid var(--line);border-radius:8px;padding:8px;margin:0;font:14px/1.45 system-ui,sans-serif}
 ul{padding-left:20px;margin:6px 0}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:6px;border-bottom:1px solid var(--line);font-size:.95rem}
 details summary{cursor:pointer;color:var(--brand);font-weight:600}
 </style></head><body>
-<header><a href="/">Chetna Social</a>${opts.loggedIn ? '<form method="post" action="/logout" style="margin:0"><button style="padding:4px 10px">Log out</button></form>' : ''}</header>
+<header><nav style="display:flex;gap:16px;align-items:center"><a href="/">Chetna Social</a>${opts.loggedIn ? '<a href="/" style="font-weight:400">Posts</a><a href="/reviews" style="font-weight:400">Reviews</a>' : ''}</nav>${opts.loggedIn ? '<form method="post" action="/logout" style="margin:0"><button style="padding:4px 10px">Log out</button></form>' : ''}</header>
 <main>${body}</main></body></html>`;
 }
 
@@ -56,7 +59,7 @@ export function loginPage(error?: string): string {
   );
 }
 
-function badge(status: string): string {
+export function badge(status: string): string {
   return `<span class="badge ${esc(status)}">${esc(STATUS_LABEL[status] ?? status)}</span>`;
 }
 

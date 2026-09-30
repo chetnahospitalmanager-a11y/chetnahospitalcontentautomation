@@ -3,9 +3,11 @@ import { config, gbpEnabled, instagramEnabled, metaEnabled } from './config.ts';
 import { initDb } from './db.ts';
 import { createApp } from './web/app.ts';
 import { createScheduledDraft, recoverInterruptedPublishes } from './workflow.ts';
+import { recoverInterruptedReplies, syncReviews } from './reviews.ts';
 
 await initDb();
 await recoverInterruptedPublishes();
+await recoverInterruptedReplies();
 const app = createApp();
 
 app.listen(config.port, () => {
@@ -25,4 +27,17 @@ if (config.draftCron.trim()) {
     { timezone: config.timezone },
   );
   console.log(`[schedule] drafts on "${config.draftCron}" (${config.timezone})`);
+}
+
+if (config.reviewCron.trim() && gbpEnabled()) {
+  cron.schedule(
+    config.reviewCron,
+    () => {
+      syncReviews()
+        .then((s) => console.log(`[reviews] ${s.profiles} profiles, ${s.newReviews} new, ${s.drafted} drafted, ${s.errors.length} errors`))
+        .catch((err) => console.error('[reviews] sync failed:', err));
+    },
+    { timezone: config.timezone },
+  );
+  console.log(`[reviews] checking Google reviews on "${config.reviewCron}" (${config.timezone})`);
 }

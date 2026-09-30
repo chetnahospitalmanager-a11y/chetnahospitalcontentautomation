@@ -19,6 +19,28 @@ export function complianceWarnings(text: string): string[] {
   return RULES.filter((r) => r.pattern.test(text)).map((r) => r.message);
 }
 
+// Review replies are public. Confirming that someone was a patient, or mentioning their condition or
+// treatment, breaches patient confidentiality even if the reviewer mentioned it first.
+const REPLY_RULES: { pattern: RegExp; message: string }[] = [
+  { pattern: /\byour\s+(surgery|operation|treatment|diagnosis|condition|illness|disease|reports?|procedure|delivery|admission|stay|recovery|medication|prescription|bill|case)\b/i, message: 'Mentions the reviewer\'s own treatment or condition (patient confidentiality)' },
+  { pattern: /\b(our|the)\s+records\s+(show|indicate)\b/i, message: 'Refers to hospital records about the reviewer' },
+  { pattern: /\b(you|your\s+\w+)\s+(were|was)\s+(admitted|treated|operated|discharged|diagnosed)\b/i, message: 'Confirms the reviewer was treated here' },
+  { pattern: /\b(fake|liar|lying|false review|defam)/i, message: 'Accuses the reviewer; keep replies calm and neutral' },
+];
+
+export function replyWarnings(text: string): string[] {
+  return [...complianceWarnings(text), ...REPLY_RULES.filter((r) => r.pattern.test(text)).map((r) => r.message)];
+}
+
+export const REPLY_RULES_TEXT = `Rules you must follow:
+- Patient confidentiality: never confirm the reviewer was a patient, and never mention any condition, treatment, test, surgery, bill or visit detail, even if the reviewer mentioned it.
+- Never argue, blame, or call a review fake. Stay calm, polite and brief.
+- For a complaint (1-3 stars): thank them, apologise that their experience fell short, say the feedback is being looked into, and invite them to contact the hospital directly so it can be resolved.
+- For praise (4-5 stars): thank them warmly and briefly; you may say the feedback will be shared with the team.
+- No superlatives ("best", "No. 1"), no promises of results, no offers or discounts.
+- Plain English, 25-70 words, no hashtags, no links, at most 1 emoji. Address the reviewer by first name only if a name is given.
+- Sign off as "Team {HOSPITAL}".`;
+
 export const CAPTION_RULES = `Rules you must follow (Indian NMC rules on medical advertising):
 - Never use superlatives or rankings: no "best", "No. 1", "top", "leading", "renowned".
 - Never promise results: no "cure", "guaranteed", "100%", "permanent relief", "painless", "risk-free".

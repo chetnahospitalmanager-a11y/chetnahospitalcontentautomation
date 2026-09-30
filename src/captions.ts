@@ -1,5 +1,5 @@
 import { bookingLink, config } from './config.ts';
-import { CAPTION_RULES } from './compliance.ts';
+import { CAPTION_RULES, REPLY_RULES_TEXT } from './compliance.ts';
 import { loadHospital } from './hospital.ts';
 import type { Topic } from './topics.ts';
 
@@ -82,6 +82,45 @@ Rewrite it following this feedback from hospital staff: ${feedback.trim().slice(
 The rules above still apply. Facts you may use:
 ${topic.facts.map((f) => `- ${f}`).join('\n')}`;
   return generate(systemPrompt(), prompt);
+}
+
+export interface ReviewForReply {
+  reviewer: string;
+  rating: number;
+  comment: string;
+  profileTitle: string;
+}
+
+function replySystemPrompt(): string {
+  const h = loadHospital().hospital;
+  const contact = config.reviewContactLine ? `\nWhen inviting them to get in touch, use exactly: "${config.reviewContactLine}"` : '';
+  return `You write public owner replies to Google reviews for ${h.name}, ${h.location}.
+${REPLY_RULES_TEXT.replace('{HOSPITAL}', h.shortName)}${contact}`;
+}
+
+function reviewPrompt(r: ReviewForReply): string {
+  return `Google profile: ${r.profileTitle}
+Reviewer name: ${r.reviewer}
+Rating: ${r.rating} of 5 stars
+Review text: ${r.comment ? `"""${r.comment.slice(0, 3000)}"""` : '(no text, star rating only)'}`;
+}
+
+export async function writeReviewReply(r: ReviewForReply): Promise<string> {
+  return generate(replySystemPrompt(), `Write the owner reply to this review.\n${reviewPrompt(r)}`);
+}
+
+export async function reviseReviewReply(r: ReviewForReply, current: string, feedback: string): Promise<string> {
+  return generate(
+    replySystemPrompt(),
+    `${reviewPrompt(r)}
+
+Current draft reply:
+"""
+${current}
+"""
+Rewrite it following this feedback from hospital staff: ${feedback.trim().slice(0, 1000)}
+The rules above still apply.`,
+  );
 }
 
 /** Caption as published on Facebook/Instagram: body + booking footer + hashtags. */

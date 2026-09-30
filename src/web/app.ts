@@ -1,6 +1,8 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { config } from '../config.ts';
-import { getPost, listPosts, type PostKind } from '../db.ts';
+import { config, gbpEnabled } from '../config.ts';
+import { getKv, getPost, getReview, listPosts, listReviewRows, type PostKind } from '../db.ts';
+import { draftReply, postReply, reviseReply, saveReply, skipReview, syncReviews, type SyncSummary } from '../reviews.ts';
+import { reviewsPage } from './reviewViews.ts';
 import { renderPostImage } from '../images.ts';
 import { nextTopic, topicFor } from '../topics.ts';
 import { approveAndPublish, createDraft, createScheduledDraft, describeTargets, requestChanges, saveCaption, skip } from '../workflow.ts';
@@ -26,6 +28,13 @@ const FLASH: Record<string, string> = {
   published: 'Posted everywhere.',
   partial: 'Posted to some channels. See the results for what failed.',
   failed: 'Posting failed. See the results below.',
+  replied: 'Reply posted on Google.',
+  reply_failed: 'Google did not accept the reply. See the error on the review.',
+  reply_saved: 'Reply saved.',
+  reply_revised: 'Gemini rewrote the reply. Check it again.',
+  reply_drafted: 'Reply drafted. Check it before posting.',
+  review_skipped: 'Marked as not needing a reply.',
+  synced: 'Checked Google for new reviews.',
 };
 
 type Handler = (req: Request, res: Response) => Promise<void>;
@@ -93,6 +102,17 @@ export function createApp() {
       }
       const post = await createScheduledDraft();
       res.json({ ok: true, created: post ? post.id : null });
+    }),
+  );
+
+  app.post(
+    '/cron/reviews',
+    wrap(async (req, res) => {
+      if (!secretMatches(req.header('x-cron-secret'), config.cronSecret)) {
+        res.status(403).json({ ok: false });
+        return;
+      }
+      res.json({ ok: true, summary: await syncReviews() });
     }),
   );
 
@@ -212,6 +232,104 @@ export function createApp() {
         throw new Error('Tick "I have checked the wording" first');
       }
       return (await approveAndPublish(id)).status;
+    }),
+  );
+
+  // ---------------------------------------------------------------- Google review replies
+
+  async function renderReviews(req: Request, res: Response, extra: { error?: string; status?: number } = {}) {
+    const [open, recent, last] = await Promise.all([
+      listReviewRows({ status: ['draft', 'failed'] }),
+      listReviewRows({ status: ['replied', 'replied_elsewhere', 'skipped'], limit: 30 }),
+      getKv('reviews:lastSync'),
+    ]);
+    recent.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    res.status(extra.status ?? 200).send(
+      reviewsPage({
+        open,
+        recent,
+        lastSync: last ? (JSON.parse(last) as SyncSummary) : null,
+        gbpConnected: gbpEnabled(),
+        csrf: csrfToken(req),
+        flash: FLASH[String(req.query.ok ?? '')],
+        error: extra.error,
+      }),
+    );
+  }
+
+  app.get(
+    '/reviews',
+    wrap(async (req, res) => {
+      await renderReviews(req, res);
+    }),
+  );
+
+  app.post(
+    '/reviews/sync',
+    requireCsrf,
+    wrap(async (req, res) => {
+      try {
+        await syncReviews();
+        res.redirect(303, '/reviews?ok=synced');
+      } catch (err) {
+        await renderReviews(req, res, { error: (err as Error).message, status: 400 });
+      }
+    }),
+  );
+
+  const reviewAction = (fn: (req: Request, id: number) => Promise<string>) =>
+    wrap(async (req, res) => {
+      const id = postId(req);
+      try {
+        const ok = await fn(req, id);
+        res.redirect(303, `/reviews?ok=${ok}#r${id}`);
+      } catch (err) {
+        await renderReviews(req, res, { error: (err as Error).message, status: 400 });
+      }
+    });
+
+  app.post(
+    '/reviews/:id/draft',
+    requireCsrf,
+    reviewAction(async (_req, id) => {
+      await draftReply(id);
+      return 'reply_drafted';
+    }),
+  );
+  app.post(
+    '/reviews/:id/save',
+    requireCsrf,
+    reviewAction(async (req, id) => {
+      await saveReply(id, String(req.body.reply ?? ''));
+      return 'reply_saved';
+    }),
+  );
+  app.post(
+    '/reviews/:id/revise',
+    requireCsrf,
+    reviewAction(async (req, id) => {
+      const feedback = String(req.body.feedback ?? '').trim();
+      if (!feedback) throw new Error('Write what should change');
+      await reviseReply(id, feedback);
+      return 'reply_revised';
+    }),
+  );
+  app.post(
+    '/reviews/:id/skip',
+    requireCsrf,
+    reviewAction(async (_req, id) => {
+      await skipReview(id);
+      return 'review_skipped';
+    }),
+  );
+  app.post(
+    '/reviews/:id/post',
+    requireCsrf,
+    reviewAction(async (req, id) => {
+      const r = await getReview(id);
+      if (r?.warnings.length && req.body.confirm !== 'yes') throw new Error('Tick "I have checked the wording" first');
+      const after = await postReply(id);
+      return after.status === 'replied' ? 'replied' : 'reply_failed';
     }),
   );
 

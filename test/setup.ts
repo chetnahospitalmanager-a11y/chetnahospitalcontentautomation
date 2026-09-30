@@ -28,5 +28,6 @@ process.env.DATABASE_URL = `file:${join(dir, 'test.db')}`;
 process.env.APP_PASSWORD = 'test-password';
 process.env.SESSION_SECRET = 'x'.repeat(40);
 process.env.DRAFT_CRON = '';
+process.env.REVIEW_CRON = '';
 process.env.BOOKING_WHATSAPP_NUMBER = '910000000000';
 process.env.BOOKING_PHONE_DISPLAY = '+91 00000 00000';

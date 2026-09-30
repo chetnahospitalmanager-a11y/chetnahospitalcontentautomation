@@ -96,6 +96,24 @@ export const config = {
     return str('GBP_HOSPITAL_LOCATION');
   },
 
+  // Google review replies
+  /** When to fetch new reviews. Default: every 3 hours from 08:15 to 20:15. Empty string disables. */
+  get reviewCron() {
+    return process.env.REVIEW_CRON ?? '15 8-20/3 * * *';
+  },
+  /** Only reviews newer than this are picked up (so the first sync doesn't pull years of old reviews). */
+  get reviewMaxAgeDays() {
+    return Number(str('REVIEW_MAX_AGE_DAYS', '60'));
+  },
+  /** Max Gemini drafts per sync; the rest are drafted on the next sync (free-tier friendly). */
+  get reviewDraftsPerSync() {
+    return Number(str('REVIEW_DRAFTS_PER_SYNC', '20'));
+  },
+  /** Sentence used when inviting an unhappy reviewer to get in touch, e.g. "Please call our front desk on 020-XXXXXXX." */
+  get reviewContactLine() {
+    return str('REVIEW_CONTACT_LINE');
+  },
+
   // Optional WhatsApp alert (send-only) via WATI when a draft is ready
   get watiApiEndpoint() {
     return str('WATI_API_ENDPOINT').replace(/\/+$/, '');
