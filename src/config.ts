@@ -1,0 +1,130 @@
+import 'dotenv/config';
+
+function str(name: string, fallback = ''): string {
+  return (process.env[name] ?? fallback).trim();
+}
+
+function list(name: string): string[] {
+  return str(name)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Read lazily so tests can change process.env between cases.
+export const config = {
+  get port() {
+    return Number(str('PORT', '3000'));
+  },
+  /** Public https URL of this service, e.g. https://chetna-social.onrender.com. Instagram and Google fetch images from here. */
+  get publicBaseUrl() {
+    return str('PUBLIC_BASE_URL').replace(/\/+$/, '');
+  },
+  get timezone() {
+    return str('TZ_NAME', 'Asia/Kolkata');
+  },
+
+  // Approval page
+  get appPassword() {
+    return str('APP_PASSWORD');
+  },
+  get sessionSecret() {
+    return str('SESSION_SECRET');
+  },
+  /** Lets an external scheduler (e.g. cron-job.org) trigger the scheduled draft when the free host is asleep. */
+  get cronSecret() {
+    return str('CRON_SECRET');
+  },
+  /** Cron expression for automatic drafts. Default: Mon/Wed/Fri 10:00. Empty string disables. */
+  get draftCron() {
+    return process.env.DRAFT_CRON ?? '0 10 * * 1,3,5';
+  },
+  get maxPendingDrafts() {
+    return Number(str('MAX_PENDING_DRAFTS', '2'));
+  },
+
+  // Database: a local file by default, or Turso (libsql://...) in production.
+  get databaseUrl() {
+    return str('DATABASE_URL', 'file:social.db');
+  },
+  get databaseAuthToken() {
+    return str('DATABASE_AUTH_TOKEN');
+  },
+
+  // Gemini
+  get geminiApiKey() {
+    return str('GEMINI_API_KEY');
+  },
+  get geminiModel() {
+    return str('GEMINI_MODEL', 'gemini-flash-lite-latest');
+  },
+
+  // Booking links placed in every post
+  get bookingWhatsappNumber() {
+    return str('BOOKING_WHATSAPP_NUMBER').replace(/\D/g, '');
+  },
+  get bookingPhoneDisplay() {
+    return str('BOOKING_PHONE_DISPLAY');
+  },
+
+  // Meta (Facebook Page + Instagram)
+  get metaPageId() {
+    return str('META_PAGE_ID');
+  },
+  get metaPageAccessToken() {
+    return str('META_PAGE_ACCESS_TOKEN');
+  },
+  get metaIgUserId() {
+    return str('META_IG_USER_ID');
+  },
+  get metaGraphVersion() {
+    return str('META_GRAPH_VERSION', 'v23.0');
+  },
+
+  // Google Business Profile
+  get gbpClientId() {
+    return str('GBP_CLIENT_ID');
+  },
+  get gbpClientSecret() {
+    return str('GBP_CLIENT_SECRET');
+  },
+  get gbpRefreshToken() {
+    return str('GBP_REFRESH_TOKEN');
+  },
+  /** Optional: force which location is the hospital, e.g. "locations/123456". */
+  get gbpHospitalLocation() {
+    return str('GBP_HOSPITAL_LOCATION');
+  },
+
+  // Optional WhatsApp alert (send-only) via WATI when a draft is ready
+  get watiApiEndpoint() {
+    return str('WATI_API_ENDPOINT').replace(/\/+$/, '');
+  },
+  get watiApiToken() {
+    return str('WATI_API_TOKEN');
+  },
+  get watiTemplateName() {
+    return str('WATI_DRAFT_TEMPLATE', 'chetna_bot_social_draft_ready_mkt');
+  },
+  get alertPhones() {
+    return list('ALERT_PHONES').map((p) => p.replace(/\D/g, ''));
+  },
+};
+
+export function metaEnabled(): boolean {
+  return Boolean(config.metaPageId && config.metaPageAccessToken);
+}
+
+export function instagramEnabled(): boolean {
+  return metaEnabled() && Boolean(config.metaIgUserId);
+}
+
+export function gbpEnabled(): boolean {
+  return Boolean(config.gbpClientId && config.gbpClientSecret && config.gbpRefreshToken);
+}
+
+export function bookingLink(prefill?: string): string {
+  if (!config.bookingWhatsappNumber) return '';
+  const base = `https://wa.me/${config.bookingWhatsappNumber}`;
+  return prefill ? `${base}?text=${encodeURIComponent(prefill)}` : base;
+}

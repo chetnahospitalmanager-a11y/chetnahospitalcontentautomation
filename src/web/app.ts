@@ -1,0 +1,225 @@
+import express, { type NextFunction, type Request, type Response } from 'express';
+import { config } from '../config.ts';
+import { getPost, listPosts, type PostKind } from '../db.ts';
+import { renderPostImage } from '../images.ts';
+import { nextTopic, topicFor } from '../topics.ts';
+import { approveAndPublish, createDraft, createScheduledDraft, describeTargets, requestChanges, saveCaption, skip } from '../workflow.ts';
+import {
+  checkPassword,
+  csrfToken,
+  endSession,
+  loginAllowed,
+  recordLoginFailure,
+  requireCsrf,
+  requireLogin,
+  requireSameOrigin,
+  secretMatches,
+  startSession,
+} from './auth.ts';
+import { dashboardPage, loginPage, postPage } from './views.ts';
+
+const FLASH: Record<string, string> = {
+  created: 'Draft written. Review it below.',
+  saved: 'Caption saved.',
+  revised: 'Gemini rewrote the caption. Check it again.',
+  skipped: 'Post skipped.',
+  published: 'Posted everywhere.',
+  partial: 'Posted to some channels. See the results for what failed.',
+  failed: 'Posting failed. See the results below.',
+};
+
+type Handler = (req: Request, res: Response) => Promise<void>;
+const wrap = (fn: Handler) => (req: Request, res: Response, next: NextFunction) => fn(req, res).catch(next);
+
+function postId(req: Request): number {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) throw Object.assign(new Error('Post not found'), { status: 404 });
+  return id;
+}
+
+async function renderPost(req: Request, res: Response, id: number, extra: { error?: string; status?: number } = {}) {
+  const post = await getPost(id);
+  if (!post) {
+    res.status(404).send('Post not found');
+    return;
+  }
+  const { channels, notes } = post.status === 'draft' ? await describeTargets(post) : { channels: [], notes: [] };
+  res
+    .status(extra.status ?? 200)
+    .send(postPage({ post, channels, notes, csrf: csrfToken(req), flash: FLASH[String(req.query.ok ?? '')], error: extra.error }));
+}
+
+export function createApp() {
+  if (!config.appPassword || !config.sessionSecret || config.sessionSecret.length < 32) {
+    throw new Error('Set APP_PASSWORD and a SESSION_SECRET of at least 32 characters');
+  }
+  const app = express();
+  app.disable('x-powered-by');
+  app.set('trust proxy', 1);
+  app.use((_req, res, next) => {
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'same-origin');
+    next();
+  });
+  app.use(express.urlencoded({ extended: false, limit: '20kb' }));
+
+  // Public: health check, and images (Instagram and Google must fetch them without logging in).
+  app.get('/health', (_req, res) => {
+    res.json({ ok: true });
+  });
+  app.get(
+    '/image/:id.jpg',
+    wrap(async (req, res) => {
+      const post = await getPost(postId(req));
+      if (!post) {
+        res.status(404).end();
+        return;
+      }
+      const jpg = await renderPostImage(post.imageKey, post.title);
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.send(jpg);
+    }),
+  );
+
+  // For an external scheduler when the free host sleeps: POST with header "x-cron-secret".
+  app.post(
+    '/cron/draft',
+    wrap(async (req, res) => {
+      if (!secretMatches(req.header('x-cron-secret'), config.cronSecret)) {
+        res.status(403).json({ ok: false });
+        return;
+      }
+      const post = await createScheduledDraft();
+      res.json({ ok: true, created: post ? post.id : null });
+    }),
+  );
+
+  app.get('/login', (_req, res) => {
+    res.send(loginPage());
+  });
+  app.post('/login', requireSameOrigin, (req, res) => {
+    const ip = req.ip ?? 'unknown';
+    if (!loginAllowed(ip)) {
+      res.status(429).send(loginPage('Too many attempts. Try again in 15 minutes.'));
+      return;
+    }
+    if (!checkPassword(String(req.body?.password ?? ''))) {
+      recordLoginFailure(ip);
+      res.status(401).send(loginPage('Wrong password.'));
+      return;
+    }
+    startSession(req, res);
+    res.redirect(303, '/');
+  });
+
+  // Everything below needs a login; every POST must come from this site and carry the CSRF token.
+  app.use(requireLogin, requireSameOrigin);
+  // The header's logout button has no token field; the same-origin check is enough for a logout.
+  app.post('/logout', (_req, res) => {
+    endSession(res);
+    res.redirect(303, '/login');
+  });
+
+  app.get(
+    '/',
+    wrap(async (req, res) => {
+      const [drafts, recent] = await Promise.all([listPosts({ status: ['draft'] }), listPosts({ limit: 30 })]);
+      res.send(
+        dashboardPage({
+          drafts,
+          recent: recent.filter((p) => p.status !== 'draft'),
+          csrf: csrfToken(req),
+          flash: FLASH[String(req.query.ok ?? '')],
+        }),
+      );
+    }),
+  );
+
+  app.post(
+    '/posts',
+    requireCsrf,
+    wrap(async (req, res) => {
+      const choice = String(req.body.topic ?? 'next');
+      const custom = String(req.body.custom ?? '').trim();
+      let topic;
+      if (choice === 'custom' || (choice === 'next' && custom)) {
+        if (!custom) throw Object.assign(new Error('Type a custom topic first'), { status: 400 });
+        topic = topicFor('custom', custom);
+      } else if (choice === 'next') {
+        topic = await nextTopic();
+      } else {
+        const [kind, subject] = choice.split(':');
+        topic = topicFor(kind as PostKind, subject ?? '');
+      }
+      if (!topic) throw Object.assign(new Error('Unknown topic'), { status: 400 });
+      const post = await createDraft(topic);
+      res.redirect(303, `/posts/${post.id}?ok=created`);
+    }),
+  );
+
+  app.get(
+    '/posts/:id',
+    wrap(async (req, res) => {
+      await renderPost(req, res, postId(req));
+    }),
+  );
+
+  const action = (fn: (req: Request, id: number) => Promise<string>) =>
+    wrap(async (req, res) => {
+      const id = postId(req);
+      try {
+        const ok = await fn(req, id);
+        res.redirect(303, ok === 'skipped' ? '/?ok=skipped' : `/posts/${id}?ok=${ok}`);
+      } catch (err) {
+        await renderPost(req, res, id, { error: (err as Error).message, status: 400 });
+      }
+    });
+
+  app.post(
+    '/posts/:id/caption',
+    requireCsrf,
+    action(async (req, id) => {
+      await saveCaption(id, String(req.body.caption ?? ''));
+      return 'saved';
+    }),
+  );
+  app.post(
+    '/posts/:id/revise',
+    requireCsrf,
+    action(async (req, id) => {
+      const feedback = String(req.body.feedback ?? '').trim();
+      if (!feedback) throw new Error('Write what should change');
+      await requestChanges(id, feedback);
+      return 'revised';
+    }),
+  );
+  app.post(
+    '/posts/:id/skip',
+    requireCsrf,
+    action(async (_req, id) => {
+      await skip(id);
+      return 'skipped';
+    }),
+  );
+  app.post(
+    '/posts/:id/publish',
+    requireCsrf,
+    action(async (req, id) => {
+      const post = await getPost(id);
+      if (post?.status === 'draft' && post.warnings.length && req.body.confirm !== 'yes') {
+        throw new Error('Tick "I have checked the wording" first');
+      }
+      return (await approveAndPublish(id)).status;
+    }),
+  );
+
+  app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status ?? 500;
+    if (status >= 500) console.error('[web]', err);
+    res.status(status).send(status >= 500 ? 'Something went wrong. Check the server logs.' : err.message);
+  });
+
+  return app;
+}
