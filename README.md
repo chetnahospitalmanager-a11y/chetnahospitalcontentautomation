@@ -1,7 +1,8 @@
 # Chetna Hospital: social media & Google Business Profile automation
 
-A small standalone service, separate from the WhatsApp booking bot, with three jobs:
-**posting** (below), **answering Google reviews** (see [Google review replies](#google-review-replies))
+A small standalone service, separate from the WhatsApp booking bot, with four jobs:
+**posting** (below), **answering Google reviews** (see [Google review replies](#google-review-replies)),
+**answering Facebook & Instagram comments** (see [Comment replies](#facebook--instagram-comment-replies))
 and a **weekly insights report** for Google, Facebook and Instagram (see [Weekly insights report](#weekly-insights-report)).
 
 For posting, it:
@@ -74,6 +75,35 @@ posted automatically.**
 It needs the same Google setup as posting (step 3 below); nothing extra. On Render's free plan, also
 add a cron-job.org job for `POST /cron/reviews` (see step 4).
 
+## Facebook & Instagram comment replies
+
+Every 2 hours (08:45-20:45 IST) the service reads new top-level comments on the Page's and Instagram
+account's posts from the last 30 days, and Gemini sorts each one (question, wants to book, medical
+question, praise, complaint, emergency, spam, other) and drafts a short reply. They appear on the
+**Comments** page. Staff edit, ask for changes, post, mark "Don't reply", or **hide** spam/abuse.
+**Nothing is posted automatically.**
+
+- **Order:** possible emergencies first (highlighted in red), then complaints, then the oldest.
+  Comments that need no reply (tagging a friend, a lone emoji, spam) sit in a collapsed section.
+- **Replies never give medical advice** (no diagnosis, medicines or doses) and never confirm someone
+  was a patient. Health questions are invited to book a consultation; emergency-sounding comments are
+  told to come to the 24x7 emergency department. Replies are written in the comment's language
+  (English, Hindi or Marathi). The same wording checks as reviews apply, and a flagged reply needs
+  "I have checked the wording" before it can be posted.
+- **Booking link:** on Facebook the WhatsApp booking link is added where it helps; on Instagram (where
+  links in comments aren't clickable) the reply points to "the WhatsApp link in our bio" instead.
+- **Answered from the Meta apps meanwhile?** The next check marks it "Answered elsewhere", so it
+  never gets a second reply. Our own comments and comments older than 7 days are ignored.
+- **Hide comment** hides it from everyone except the commenter (and their friends, on Facebook);
+  it can be un-hidden in the Meta apps.
+- Optional WhatsApp alert: "N new comments to reply to (M urgent)".
+
+**This is not an emergency channel.** Comments are checked every 2 hours and wait for a person, so
+the Page should also say that emergencies must call the hospital or come in directly.
+
+It uses the same Page token as posting, with extra permissions (step 2 below). On Render's free plan,
+add a cron-job.org job for `POST /cron/comments` (step 4).
+
 ## Weekly insights report
 
 Every Thursday at 09:00 IST the service builds a report for the previous Monday–Sunday week (Google's
@@ -123,6 +153,7 @@ Meta, or both connected. On Render's free plan, add a cron-job.org job for
 | `src/web/*` | Approval page (password login, CSRF + same-origin checks) |
 | `src/reviews.ts`, `src/web/reviewViews.ts` | Review sync, reply drafts, posting replies, Reviews page |
 | `src/insights.ts`, `src/web/insightViews.ts` | Weekly report: Google Performance numbers, highlights, CSV, Insights page |
+| `src/comments.ts`, `src/publishers/metaComments.ts`, `src/web/commentViews.ts` | Facebook/Instagram comment sync, reply drafts, posting/hiding, Comments page |
 | `src/metaInsights.ts` | Facebook Page and Instagram numbers for the weekly report |
 | `src/notify.ts` | Optional send-only WhatsApp alert through WATI |
 | `scripts/gbp-auth.mjs` | One-time Google sign-in; saves the refresh token into `.env` without printing it |
@@ -151,9 +182,11 @@ check the department briefs and hospital facts. Add photos to `social-images/`.
 2. At developers.facebook.com create an app (type **Business**) and add the **Facebook Login for
    Business** and **Instagram Graph API** products.
 3. In **Graph API Explorer**, pick the app, request `pages_show_list`, `pages_read_engagement`,
-   `pages_manage_posts`, `read_insights`, `instagram_basic`, `instagram_content_publish`,
+   `pages_manage_posts`, `pages_read_user_content`, `pages_manage_engagement`, `read_insights`,
+   `instagram_basic`, `instagram_content_publish`, `instagram_manage_comments`,
    `instagram_manage_insights`, `business_management`, and generate a **User token**.
-   (`read_insights` and `instagram_manage_insights` are for the weekly report.)
+   (`pages_read_user_content`, `pages_manage_engagement` and `instagram_manage_comments` are for
+   comment replies; `read_insights` and `instagram_manage_insights` are for the weekly report.)
 4. Exchange it for a long-lived user token (Access Token Debugger → *Extend Access Token*), then call
    `GET /me/accounts` with it: the `access_token` next to your Page is a **Page token that does not
    expire**. That is `META_PAGE_ACCESS_TOKEN`; the Page's `id` is `META_PAGE_ID`.
@@ -190,10 +223,11 @@ You are an admin of your own Page, so posting to it works without Meta's full ap
    `MAX_PENDING_DRAFTS` waiting drafts, so the two schedules can't pile up duplicates.
    Add a second job, `POST https://<your-app>/cron/reviews` with the same header, every 3 hours
    during the day, so new reviews are fetched even while the service is asleep.
-   And a third, `POST https://<your-app>/cron/insights`, Thursdays 09:00 IST, for the weekly report.
+   And a third, `POST https://<your-app>/cron/insights`, Thursdays 09:00 IST, for the weekly report,
+   and a fourth, `POST https://<your-app>/cron/comments`, every 2 hours during the day, for comments.
 
 ### 5. Optional: WhatsApp alerts
-One WATI template covers all alerts (a draft is waiting, new reviews to answer, the weekly report).
+One WATI template covers all alerts (a draft is waiting, new reviews or comments to answer, the weekly report).
 Submit `chetna_social_update` (category Utility) with the text
 *"Chetna Social update: {{1}}. Open: {{2}}"*, then set `WATI_API_ENDPOINT`, `WATI_API_TOKEN` and
 `ALERT_PHONES`. This service only sends alerts, never receives WhatsApp messages, so it stays
@@ -203,4 +237,4 @@ separate from the booking bot.
 Create one draft, approve it, and check it appears on Facebook, Instagram and the Google profiles.
 
 ## Not built yet
-- Replying to Facebook/Instagram comments.
+- Replying to Facebook Messenger / Instagram direct messages (these would belong with the WhatsApp bot).

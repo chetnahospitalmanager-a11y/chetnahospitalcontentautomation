@@ -114,6 +114,23 @@ export const config = {
     return str('REVIEW_CONTACT_LINE');
   },
 
+  // Facebook / Instagram comment replies
+  /** When to fetch new comments. Default: every 2 hours from 08:45 to 20:45. Empty string disables. */
+  get commentCron() {
+    return process.env.COMMENT_CRON ?? '45 8-20/2 * * *';
+  },
+  /** Look for comments on posts published in the last N days. */
+  get commentPostMaxAgeDays() {
+    return Number(str('COMMENT_POST_MAX_AGE_DAYS', '30'));
+  },
+  /** Ignore comments older than N days (so the first sync doesn't dig up old threads). */
+  get commentMaxAgeDays() {
+    return Number(str('COMMENT_MAX_AGE_DAYS', '7'));
+  },
+  get commentDraftsPerSync() {
+    return Number(str('COMMENT_DRAFTS_PER_SYNC', '25'));
+  },
+
   // Weekly insights report
   /** When to build the weekly report. Default: Thursday 09:00 (Google's numbers lag a few days). Empty disables. */
   get insightsCron() {

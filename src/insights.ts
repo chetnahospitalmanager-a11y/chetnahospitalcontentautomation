@@ -48,7 +48,7 @@ export interface WeeklyReport {
   generatedAt: string;
   profiles: ProfileReport[];
   totals: Record<MetricKey, Pair>;
-  activity: { postsPublished: number; repliesPosted: number; reviewsWaiting: number };
+  activity: { postsPublished: number; repliesPosted: number; reviewsWaiting: number; commentReplies?: number; commentsWaiting?: number };
   /** Facebook / Instagram numbers (missing in reports built before this was added). */
   social?: ChannelReport[];
   highlights: string[];
@@ -149,6 +149,9 @@ export function highlights(r: Pick<WeeklyReport, 'profiles' | 'totals' | 'activi
     out.push(`${newReviews} new Google review${newReviews === 1 ? '' : 's'} this week; ${r.activity.repliesPosted} replies posted from this tool; ${r.activity.reviewsWaiting} still waiting.`);
   }
   out.push(...socialHighlights(r.social ?? []));
+  if (r.social?.length && r.activity.commentReplies !== undefined) {
+    out.push(`${r.activity.commentReplies} Facebook/Instagram comment repl${r.activity.commentReplies === 1 ? 'y' : 'ies'} posted from this tool; ${r.activity.commentsWaiting ?? 0} comment${r.activity.commentsWaiting === 1 ? '' : 's'} still waiting.`);
+  }
   out.push(`${r.activity.postsPublished} post${r.activity.postsPublished === 1 ? '' : 's'} approved and published from this tool this week.`);
   const failed = r.profiles.filter((p) => p.error);
   if (failed.length) out.push(`Could not read ${failed.length} profile${failed.length === 1 ? '' : 's'}: ${failed.map((p) => p.title).join(', ')}.`);

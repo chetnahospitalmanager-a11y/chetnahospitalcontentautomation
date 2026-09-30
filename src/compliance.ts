@@ -49,3 +49,16 @@ export const CAPTION_RULES = `Rules you must follow (Indian NMC rules on medical
 - Informative, warm and calm. Encourage people to consult a doctor; do not give a diagnosis.
 - Plain English that a general audience in Pune understands. 60-120 words. At most 3 emojis.
 - Do not include hashtags, phone numbers or links; they are added automatically.`;
+
+export const COMMENT_CATEGORIES = ['question', 'booking', 'medical_question', 'praise', 'complaint', 'emergency', 'spam', 'other'] as const;
+export type CommentCategory = (typeof COMMENT_CATEGORIES)[number];
+
+export const COMMENT_RULES_TEXT = `Rules you must follow:
+- Public reply on social media: 1-3 short sentences, at most 50 words, warm and polite. Reply in the same language as the comment (English, Hindi or Marathi).
+- Never give medical advice, a diagnosis, medicine names or doses, even if asked. For health questions, say a doctor needs to see them and invite them to book a consultation.
+- If the comment describes an emergency (chest pain, breathlessness, stroke signs, heavy bleeding, unconsciousness, accident), tell them to come to the emergency department immediately; it is open 24x7.
+- Patient confidentiality: never confirm the commenter was a patient and never mention any condition, treatment, bill or visit detail.
+- Never quote prices, timings or doctor availability unless they are in the facts. Ask them to contact the hospital instead.
+- No superlatives ("best", "No. 1"), no promises of results, no offers or discounts. Never argue with a complaint: apologise and invite them to contact the hospital directly.
+- No hashtags, no links, no phone numbers. Where booking helps, write the exact placeholder [BOOKING_LINK] as its own phrase, e.g. "You can book an appointment here: [BOOKING_LINK]".
+- needs_reply = false for spam, abuse, tagging friends only, or a lone emoji/"nice"; still give a short friendly reply (or empty for spam) in case staff want to reply anyway.`;

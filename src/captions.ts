@@ -5,16 +5,12 @@ import type { Topic } from './topics.ts';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-async function callGemini(system: string, prompt: string, json: boolean): Promise<string> {
+async function callGeminiRaw(system: string, prompt: string, schema: Record<string, unknown> | null): Promise<string> {
   if (!config.geminiApiKey) throw new Error('GEMINI_API_KEY is not set');
   const generationConfig: Record<string, unknown> = { temperature: 0.8 };
-  if (json) {
+  if (schema) {
     generationConfig.responseMimeType = 'application/json';
-    generationConfig.responseSchema = {
-      type: 'OBJECT',
-      properties: { caption: { type: 'STRING' } },
-      required: ['caption'],
-    };
+    generationConfig.responseSchema = schema;
   }
   const res = await fetch(`${API}/${encodeURIComponent(config.geminiModel)}:generateContent`, {
     method: 'POST',
@@ -28,12 +24,27 @@ async function callGemini(system: string, prompt: string, json: boolean): Promis
   });
   if (!res.ok) throw new Error(`Gemini HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const body = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-  const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
-  if (!json) return text.trim();
+  return (body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '').trim();
+}
+
+async function callGemini(system: string, prompt: string, json: boolean): Promise<string> {
+  const schema = { type: 'OBJECT', properties: { caption: { type: 'STRING' } }, required: ['caption'] };
+  const text = await callGeminiRaw(system, prompt, json ? schema : null);
+  if (!json) return text;
   try {
     return String((JSON.parse(text) as { caption?: unknown }).caption ?? '').trim();
   } catch {
     return '';
+  }
+}
+
+/** Structured answer from Gemini following `schema`; throws if it isn't valid JSON. */
+export async function generateJson<T>(system: string, prompt: string, schema: Record<string, unknown>): Promise<T> {
+  const text = await callGeminiRaw(system, prompt, schema);
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error('Gemini did not return valid JSON');
   }
 }
 

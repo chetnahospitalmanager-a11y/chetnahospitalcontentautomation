@@ -1,9 +1,20 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { config, gbpEnabled, metaEnabled } from '../config.ts';
-import { getKv, getPost, getReport, getReview, listPosts, listReports, listReviewRows, type PostKind } from '../db.ts';
+import { getComment, getKv, getPost, getReport, getReview, listCommentRows, listPosts, listReports, listReviewRows, type PostKind } from '../db.ts';
 import { draftReply, postReply, reviseReply, saveReply, skipReview, syncReviews, type SyncSummary } from '../reviews.ts';
 import { reviewsPage } from './reviewViews.ts';
 import { insightsPage } from './insightViews.ts';
+import { commentsPage } from './commentViews.ts';
+import {
+  draftCommentReply,
+  hideCommentById,
+  postCommentReply,
+  reviseCommentReply,
+  saveCommentReply,
+  skipComment,
+  syncComments,
+  type CommentSyncSummary,
+} from '../comments.ts';
 import { generateWeeklyReport, reportCsv, type WeeklyReport } from '../insights.ts';
 import { renderPostImage } from '../images.ts';
 import { nextTopic, topicFor } from '../topics.ts';
@@ -38,6 +49,14 @@ const FLASH: Record<string, string> = {
   review_skipped: 'Marked as not needing a reply.',
   synced: 'Checked Google for new reviews.',
   report_built: 'Report built.',
+  comment_replied: 'Reply posted.',
+  comment_reply_failed: 'Meta did not accept the reply. See the error on the comment.',
+  comment_saved: 'Reply saved.',
+  comment_revised: 'Gemini rewrote the reply. Check it again.',
+  comment_drafted: 'Reply drafted. Check it before posting.',
+  comment_skipped: 'Marked as not needing a reply.',
+  comment_hidden: 'Comment hidden.',
+  comments_synced: 'Checked Facebook and Instagram for new comments.',
 };
 
 type Handler = (req: Request, res: Response) => Promise<void>;
@@ -128,6 +147,17 @@ export function createApp() {
       }
       const r = await generateWeeklyReport({ alert: true });
       res.json({ ok: true, report: r.id, week: r.weekStart });
+    }),
+  );
+
+  app.post(
+    '/cron/comments',
+    wrap(async (req, res) => {
+      if (!secretMatches(req.header('x-cron-secret'), config.cronSecret)) {
+        res.status(403).json({ ok: false });
+        return;
+      }
+      res.json({ ok: true, summary: await syncComments() });
     }),
   );
 
@@ -345,6 +375,111 @@ export function createApp() {
       if (r?.warnings.length && req.body.confirm !== 'yes') throw new Error('Tick "I have checked the wording" first');
       const after = await postReply(id);
       return after.status === 'replied' ? 'replied' : 'reply_failed';
+    }),
+  );
+
+  // ---------------------------------------------------------------- Facebook / Instagram comments
+
+  async function renderComments(req: Request, res: Response, extra: { error?: string; status?: number } = {}) {
+    const [open, recent, last] = await Promise.all([
+      listCommentRows({ status: ['draft', 'failed'] }),
+      listCommentRows({ status: ['replied', 'replied_elsewhere', 'skipped', 'hidden'], limit: 30 }),
+      getKv('comments:lastSync'),
+    ]);
+    recent.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    res.status(extra.status ?? 200).send(
+      commentsPage({
+        open,
+        recent,
+        lastSync: last ? (JSON.parse(last) as CommentSyncSummary) : null,
+        metaConnected: metaEnabled(),
+        csrf: csrfToken(req),
+        flash: FLASH[String(req.query.ok ?? '')],
+        error: extra.error,
+      }),
+    );
+  }
+
+  app.get(
+    '/comments',
+    wrap(async (req, res) => {
+      await renderComments(req, res);
+    }),
+  );
+  app.post(
+    '/comments/sync',
+    requireCsrf,
+    wrap(async (req, res) => {
+      try {
+        await syncComments();
+        res.redirect(303, '/comments?ok=comments_synced');
+      } catch (err) {
+        await renderComments(req, res, { error: (err as Error).message, status: 400 });
+      }
+    }),
+  );
+
+  const commentAction = (fn: (req: Request, id: number) => Promise<string>) =>
+    wrap(async (req, res) => {
+      const id = postId(req);
+      try {
+        const ok = await fn(req, id);
+        res.redirect(303, `/comments?ok=${ok}#c${id}`);
+      } catch (err) {
+        await renderComments(req, res, { error: (err as Error).message, status: 400 });
+      }
+    });
+
+  app.post(
+    '/comments/:id/draft',
+    requireCsrf,
+    commentAction(async (_req, id) => {
+      await draftCommentReply(id);
+      return 'comment_drafted';
+    }),
+  );
+  app.post(
+    '/comments/:id/save',
+    requireCsrf,
+    commentAction(async (req, id) => {
+      await saveCommentReply(id, String(req.body.reply ?? ''));
+      return 'comment_saved';
+    }),
+  );
+  app.post(
+    '/comments/:id/revise',
+    requireCsrf,
+    commentAction(async (req, id) => {
+      const feedback = String(req.body.feedback ?? '').trim();
+      if (!feedback) throw new Error('Write what should change');
+      await reviseCommentReply(id, feedback);
+      return 'comment_revised';
+    }),
+  );
+  app.post(
+    '/comments/:id/skip',
+    requireCsrf,
+    commentAction(async (_req, id) => {
+      await skipComment(id);
+      return 'comment_skipped';
+    }),
+  );
+  app.post(
+    '/comments/:id/hide',
+    requireCsrf,
+    commentAction(async (_req, id) => {
+      await hideCommentById(id);
+      return 'comment_hidden';
+    }),
+  );
+  app.post(
+    '/comments/:id/post',
+    requireCsrf,
+    commentAction(async (req, id) => {
+      const c = await getComment(id);
+      if (c?.warnings.length && req.body.confirm !== 'yes') throw new Error('Tick "I have checked the wording" first');
+      const after = await postCommentReply(id);
+      return after.status === 'replied' ? 'comment_replied' : 'comment_reply_failed';
     }),
   );
 

@@ -15,7 +15,8 @@ const STATUS_LABEL: Record<string, string> = {
   skipped: 'Skipped',
   posting: 'Posting…',
   replied: 'Replied',
-  replied_elsewhere: 'Answered in the Google app',
+  replied_elsewhere: 'Answered elsewhere',
+  hidden: 'Hidden',
 };
 
 export function layout(title: string, body: string, opts: { loggedIn?: boolean } = {}): string {
@@ -46,7 +47,7 @@ ul{padding-left:20px;margin:6px 0}table{width:100%;border-collapse:collapse}td,t
 details summary{cursor:pointer;color:var(--brand);font-weight:600}
 @media(max-width:480px){header .brand{display:none}header{gap:8px}}
 </style></head><body>
-<header><nav style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><a href="/" class="brand">Chetna Social</a>${opts.loggedIn ? '<a href="/" style="font-weight:400">Posts</a><a href="/reviews" style="font-weight:400">Reviews</a><a href="/insights" style="font-weight:400">Insights</a>' : ''}</nav>${opts.loggedIn ? '<form method="post" action="/logout" style="margin:0"><button style="padding:4px 10px">Log out</button></form>' : ''}</header>
+<header><nav style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><a href="/" class="brand">Chetna Social</a>${opts.loggedIn ? '<a href="/" style="font-weight:400">Posts</a><a href="/reviews" style="font-weight:400">Reviews</a><a href="/comments" style="font-weight:400">Comments</a><a href="/insights" style="font-weight:400">Insights</a>' : ''}</nav>${opts.loggedIn ? '<form method="post" action="/logout" style="margin:0"><button style="padding:4px 10px">Log out</button></form>' : ''}</header>
 <main>${body}</main></body></html>`;
 }
 
