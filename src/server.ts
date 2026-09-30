@@ -7,7 +7,26 @@ import { recoverInterruptedReplies, syncReviews } from './reviews.ts';
 import { generateWeeklyReport } from './insights.ts';
 import { recoverInterruptedCommentReplies, syncComments } from './comments.ts';
 
-await initDb();
+// Fail fast with a message that names the setting to fix (these show up in the host's deploy log).
+const missing = [
+  !config.appPassword && 'APP_PASSWORD',
+  config.sessionSecret.length < 32 && 'SESSION_SECRET (at least 32 characters)',
+].filter(Boolean);
+if (missing.length) {
+  console.error(`[startup] Missing settings: ${missing.join(', ')}. Add them in the host's environment settings and redeploy.`);
+  process.exit(1);
+}
+
+try {
+  await initDb();
+} catch (err) {
+  const e = err as Error & { cause?: Error; code?: string };
+  console.error(
+    `[startup] Could not open the database at ${config.databaseUrl.replace(/\?.*$/, '')}: ${e.code ?? ''} ${e.message}${e.cause ? ` (${e.cause.message})` : ''}`.trim(),
+  );
+  console.error('[startup] Check DATABASE_URL and DATABASE_AUTH_TOKEN (a rotated or expired Turso token gives "401"/"Unauthorized").');
+  process.exit(1);
+}
 await recoverInterruptedPublishes();
 await recoverInterruptedReplies();
 await recoverInterruptedCommentReplies();
