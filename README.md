@@ -2,7 +2,7 @@
 
 A small standalone service, separate from the WhatsApp booking bot, with three jobs:
 **posting** (below), **answering Google reviews** (see [Google review replies](#google-review-replies))
-and a **weekly Google insights report** (see [Weekly insights report](#weekly-insights-report)).
+and a **weekly insights report** for Google, Facebook and Instagram (see [Weekly insights report](#weekly-insights-report)).
 
 For posting, it:
 
@@ -87,13 +87,25 @@ numbers take a few days to settle, hence Thursday) and shows it on the **Insight
   invented: which doctor got the most calls, profiles whose views fell or grew by 25%+, ratings below
   4.0, new reviews vs replies still waiting, and posts published that week.
 - **Download CSV** for Excel/Google Sheets, and **Past weeks** to look back.
+- **Facebook:** followers, media views (how often posts/photos/videos were seen), number of posts, and
+  reactions + comments + shares on that week's posts, with the best post linked.
+- **Instagram:** followers, views, accounts reached, interactions, profile button taps, new followers,
+  number of posts, and likes + comments on that week's posts, with the best post linked.
 - Optional WhatsApp alert with the headline numbers and a link.
+
+Meta keeps retiring insights metrics (Page "impressions" in Nov 2025; reach, engagement and follows in
+June 2026). Each metric is fetched separately, so if Meta retires another one the report shows it as
+"Not available" with Meta's message instead of failing. Post engagement is counted from the posts
+themselves (likes, comments, shares), which Meta hasn't been retiring. If Meta renames the Facebook
+views metric again, set `META_FB_VIEWS_METRIC`.
 
 "Build latest week's report now" rebuilds it on demand; rebuilding a week replaces it rather than adding a
 duplicate. If one profile can't be read, the report still builds and names that profile.
 
-It uses the same Google sign-in as posting, plus one more API to enable: **Business Profile
-Performance API** (step 3 below). On Render's free plan, add a cron-job.org job for
+The Google part uses the same Google sign-in as posting, plus one more API to enable: **Business Profile
+Performance API** (step 3 below). The Facebook/Instagram part uses the same Page token as posting, but
+the token needs the insights permissions listed in step 2. The report works with only Google, only
+Meta, or both connected. On Render's free plan, add a cron-job.org job for
 `POST /cron/insights` (step 4).
 
 ### Code map
@@ -111,6 +123,7 @@ Performance API** (step 3 below). On Render's free plan, add a cron-job.org job 
 | `src/web/*` | Approval page (password login, CSRF + same-origin checks) |
 | `src/reviews.ts`, `src/web/reviewViews.ts` | Review sync, reply drafts, posting replies, Reviews page |
 | `src/insights.ts`, `src/web/insightViews.ts` | Weekly report: Google Performance numbers, highlights, CSV, Insights page |
+| `src/metaInsights.ts` | Facebook Page and Instagram numbers for the weekly report |
 | `src/notify.ts` | Optional send-only WhatsApp alert through WATI |
 | `scripts/gbp-auth.mjs` | One-time Google sign-in; saves the refresh token into `.env` without printing it |
 | `scripts/gbp-locations.ts` | Read-only check of which profile matched which doctor |
@@ -138,8 +151,9 @@ check the department briefs and hospital facts. Add photos to `social-images/`.
 2. At developers.facebook.com create an app (type **Business**) and add the **Facebook Login for
    Business** and **Instagram Graph API** products.
 3. In **Graph API Explorer**, pick the app, request `pages_show_list`, `pages_read_engagement`,
-   `pages_manage_posts`, `instagram_basic`, `instagram_content_publish`, `business_management`,
-   and generate a **User token**.
+   `pages_manage_posts`, `read_insights`, `instagram_basic`, `instagram_content_publish`,
+   `instagram_manage_insights`, `business_management`, and generate a **User token**.
+   (`read_insights` and `instagram_manage_insights` are for the weekly report.)
 4. Exchange it for a long-lived user token (Access Token Debugger → *Extend Access Token*), then call
    `GET /me/accounts` with it: the `access_token` next to your Page is a **Page token that does not
    expire**. That is `META_PAGE_ACCESS_TOKEN`; the Page's `id` is `META_PAGE_ID`.
@@ -189,4 +203,4 @@ separate from the booking bot.
 Create one draft, approve it, and check it appears on Facebook, Instagram and the Google profiles.
 
 ## Not built yet
-- Facebook/Instagram numbers in the weekly report (needs the `read_insights` / `instagram_manage_insights` permissions).
+- Replying to Facebook/Instagram comments.

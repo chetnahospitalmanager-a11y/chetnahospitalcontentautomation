@@ -1,6 +1,7 @@
-import { config, gbpEnabled } from './config.ts';
+import { config, gbpEnabled, metaEnabled } from './config.ts';
 import { activityBetween, listReports, saveReport, type ReportRow } from './db.ts';
 import { findDoctor } from './hospital.ts';
+import { socialReport, zonedMidnight, type ChannelReport } from './metaInsights.ts';
 import { sendAlert } from './notify.ts';
 import { fetchDailyMetrics, getMatch, listLocations, listReviews, reviewStats } from './publishers/gbp.ts';
 
@@ -48,6 +49,8 @@ export interface WeeklyReport {
   profiles: ProfileReport[];
   totals: Record<MetricKey, Pair>;
   activity: { postsPublished: number; repliesPosted: number; reviewsWaiting: number };
+  /** Facebook / Instagram numbers (missing in reports built before this was added). */
+  social?: ChannelReport[];
   highlights: string[];
 }
 
@@ -98,15 +101,35 @@ function sumRange(series: Record<string, number>, start: string, end: string): n
 const emptyMetrics = (): Record<MetricKey, Pair> =>
   Object.fromEntries(METRIC_KEYS.map((k) => [k, { cur: 0, prev: 0 }])) as Record<MetricKey, Pair>;
 
-/** Plain-language observations, worked out from the numbers (no AI, so nothing is invented). */
 const n = (v: number) => v.toLocaleString('en-IN');
 
-export function highlights(r: Pick<WeeklyReport, 'profiles' | 'totals' | 'activity'>): string[] {
+function socialHighlights(channels: ChannelReport[]): string[] {
+  const out: string[] = [];
+  for (const c of channels) {
+    if (c.error) {
+      out.push(`Could not read ${c.label}: ${c.error}`);
+      continue;
+    }
+    const parts = c.metrics
+      .filter((m) => m.value && m.key !== 'posts')
+      .map((m) => `${n(m.value!.cur)} ${m.label.toLowerCase()} (${change(m.value!)})`);
+    parts.push(`${c.posts.cur} post${c.posts.cur === 1 ? '' : 's'} with ${n(c.engagement.cur)} ${c.channel === 'facebook' ? 'reactions, comments and shares' : 'likes and comments'} (${change(c.engagement)})`);
+    out.push(`${c.label}: ${parts.join(', ')}.`);
+    if (c.topPost && c.topPost.engagement > 0) out.push(`Best ${c.label} post this week: "${c.topPost.text || '(no caption)'}" (${n(c.topPost.engagement)} ${c.channel === 'facebook' ? 'reactions, comments and shares' : 'likes and comments'}).`);
+    if (c.posts.cur === 0) out.push(`Nothing was posted on ${c.label} this week.`);
+  }
+  return out;
+}
+
+/** Plain-language observations, worked out from the numbers (no AI, so nothing is invented). */
+export function highlights(r: Pick<WeeklyReport, 'profiles' | 'totals' | 'activity' | 'social'>): string[] {
   const out: string[] = [];
   const t = r.totals;
-  out.push(
-    `Across all profiles: ${n(t.calls.cur)} calls (${change(t.calls)}), ${n(t.directions.cur)} direction requests (${change(t.directions)}), ${n(t.website.cur)} website clicks (${change(t.website)}), ${n(t.views.cur)} profile views (${change(t.views)}).`,
-  );
+  if (r.profiles.length) {
+    out.push(
+      `Across all Google profiles: ${n(t.calls.cur)} calls (${change(t.calls)}), ${n(t.directions.cur)} direction requests (${change(t.directions)}), ${n(t.website.cur)} website clicks (${change(t.website)}), ${n(t.views.cur)} profile views (${change(t.views)}).`,
+    );
+  }
   const ok = r.profiles.filter((p) => !p.error);
   const doctors = ok.filter((p) => p.kind === 'doctor');
   const topCalls = [...doctors].sort((a, b) => b.metrics.calls.cur - a.metrics.calls.cur)[0];
@@ -121,9 +144,12 @@ export function highlights(r: Pick<WeeklyReport, 'profiles' | 'totals' | 'activi
   if (rises[0]) out.push(`Views grew on ${rises[0].title}: ${n(rises[0].metrics.views.prev)} → ${n(rises[0].metrics.views.cur)} (${change(rises[0].metrics.views)}).`);
   const low = ok.filter((p) => p.rating !== null && p.rating < 4 && p.totalReviews >= 3);
   if (low.length) out.push(`Rating below 4.0: ${low.map((p) => `${p.title} (${p.rating!.toFixed(1)})`).join(', ')}.`);
-  const newReviews = ok.reduce((n, p) => n + p.newReviews, 0);
-  out.push(`${newReviews} new Google review${newReviews === 1 ? '' : 's'} this week; ${r.activity.repliesPosted} replies posted from this tool; ${r.activity.reviewsWaiting} still waiting.`);
-  out.push(`${r.activity.postsPublished} post${r.activity.postsPublished === 1 ? '' : 's'} published this week.`);
+  if (r.profiles.length) {
+    const newReviews = ok.reduce((sum, p) => sum + p.newReviews, 0);
+    out.push(`${newReviews} new Google review${newReviews === 1 ? '' : 's'} this week; ${r.activity.repliesPosted} replies posted from this tool; ${r.activity.reviewsWaiting} still waiting.`);
+  }
+  out.push(...socialHighlights(r.social ?? []));
+  out.push(`${r.activity.postsPublished} post${r.activity.postsPublished === 1 ? '' : 's'} approved and published from this tool this week.`);
   const failed = r.profiles.filter((p) => p.error);
   if (failed.length) out.push(`Could not read ${failed.length} profile${failed.length === 1 ? '' : 's'}: ${failed.map((p) => p.title).join(', ')}.`);
   return out;
@@ -140,15 +166,15 @@ export function generateWeeklyReport(opts: { weekStart?: string; alert?: boolean
 }
 
 async function build(opts: { weekStart?: string; alert?: boolean }): Promise<ReportRow<WeeklyReport>> {
-  if (!gbpEnabled()) throw new Error('Google Business Profiles are not connected yet (GBP_* settings)');
+  if (!gbpEnabled() && !metaEnabled()) throw new Error('Nothing is connected yet: set up Google Business Profiles (GBP_*) and/or Facebook (META_*)');
   const w = opts.weekStart
     ? { weekStart: opts.weekStart, weekEnd: addDays(opts.weekStart, 6), prevStart: addDays(opts.weekStart, -7), prevEnd: addDays(opts.weekStart, -1) }
     : reportWeek(todayIn(config.timezone), config.insightsLagDays);
 
-  const locations = await listLocations();
+  const locations = gbpEnabled() ? await listLocations() : [];
   let match: Awaited<ReturnType<typeof getMatch>> | null = null;
   try {
-    match = await getMatch();
+    if (locations.length) match = await getMatch();
   } catch {
     match = null; // the report still works, just without doctor names
   }
@@ -202,16 +228,23 @@ async function build(opts: { weekStart?: string; alert?: boolean }): Promise<Rep
       totals[k].prev += p.metrics[k].prev;
     }
   }
-  const activity = await activityBetween(`${w.weekStart}T00:00:00.000Z`, `${addDays(w.weekEnd, 1)}T00:00:00.000Z`);
-  const report: WeeklyReport = { ...w, generatedAt: new Date().toISOString(), profiles, totals, activity, highlights: [] };
+  const activity = await activityBetween(
+    zonedMidnight(w.weekStart, config.timezone).toISOString(),
+    zonedMidnight(addDays(w.weekEnd, 1), config.timezone).toISOString(),
+  );
+  const social = await socialReport(w);
+  const report: WeeklyReport = { ...w, generatedAt: new Date().toISOString(), profiles, totals, activity, social, highlights: [] };
   report.highlights = highlights(report);
 
   const saved = await saveReport(w.weekStart, w.weekEnd, report);
   if (opts.alert && config.publicBaseUrl) {
-    await sendAlert(
-      `Weekly Google report ${fmtRange(w.weekStart, w.weekEnd)}: ${totals.calls.cur} calls (${change(totals.calls)}), ${totals.directions.cur} directions (${change(totals.directions)})`,
-      `${config.publicBaseUrl}/insights/${saved.id}`,
-    );
+    const parts: string[] = [];
+    if (profiles.length) parts.push(`Google ${totals.calls.cur} calls (${change(totals.calls)}), ${totals.directions.cur} directions (${change(totals.directions)})`);
+    for (const c of social) {
+      const views = c.metrics.find((m) => m.key === 'views')?.value;
+      if (views) parts.push(`${c.label} ${n(views.cur)} views (${change(views)})`);
+    }
+    await sendAlert(`Weekly report ${fmtRange(w.weekStart, w.weekEnd)}: ${parts.join('; ') || 'ready'}`, `${config.publicBaseUrl}/insights/${saved.id}`);
   }
   return saved;
 }
@@ -249,5 +282,19 @@ export function reportCsv(r: WeeklyReport): string {
     p.newReviewsAvg ?? '',
     p.error ?? '',
   ]);
-  return [header, ...rows].map((row) => row.map(cell).join(',')).join('\r\n') + '\r\n';
+  const lines = [header, ...rows];
+  if (r.social?.length) {
+    lines.push([], ['Channel', 'Metric', 'This week', 'Previous week', 'Note']);
+    for (const c of r.social) {
+      if (c.error) {
+        lines.push([c.label, 'Error', '', '', c.error]);
+        continue;
+      }
+      lines.push([c.label, 'Followers (now)', c.followers ?? '', '', '']);
+      for (const m of c.metrics) lines.push([c.label, m.label, m.value?.cur ?? '', m.value?.prev ?? '', m.note ?? '']);
+      lines.push([c.label, 'Posts', c.posts.cur, c.posts.prev, '']);
+      lines.push([c.label, 'Post engagement', c.engagement.cur, c.engagement.prev, c.channel === 'facebook' ? 'reactions + comments + shares' : 'likes + comments']);
+    }
+  }
+  return lines.map((row) => row.map(cell).join(',')).join('\r\n') + '\r\n';
 }

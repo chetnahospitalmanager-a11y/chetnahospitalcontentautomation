@@ -156,7 +156,7 @@ test('highlights stay quiet when nothing notable happened', () => {
     totals: { views: flat, calls: flat, directions: flat, website: flat },
     activity: { postsPublished: 1, repliesPosted: 0, reviewsWaiting: 0 },
   });
-  assert.equal(h.length, 3);
+  assert.deepEqual(h, ['1 post approved and published from this tool this week.'], 'no Google lines when no Google profiles are connected');
 });
 
 test('rebuilding the same week replaces it instead of adding a duplicate', async () => {

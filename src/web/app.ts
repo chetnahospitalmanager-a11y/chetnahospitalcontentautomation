@@ -1,5 +1,5 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { config, gbpEnabled } from '../config.ts';
+import { config, gbpEnabled, metaEnabled } from '../config.ts';
 import { getKv, getPost, getReport, getReview, listPosts, listReports, listReviewRows, type PostKind } from '../db.ts';
 import { draftReply, postReply, reviseReply, saveReply, skipReview, syncReviews, type SyncSummary } from '../reviews.ts';
 import { reviewsPage } from './reviewViews.ts';
@@ -358,7 +358,7 @@ export function createApp() {
       return;
     }
     res.status(extra.status ?? 200).send(
-      insightsPage({ report, history, gbpConnected: gbpEnabled(), csrf: csrfToken(req), flash: FLASH[String(req.query.ok ?? '')], error: extra.error }),
+      insightsPage({ report, history, gbpConnected: gbpEnabled(), metaConnected: metaEnabled(), csrf: csrfToken(req), flash: FLASH[String(req.query.ok ?? '')], error: extra.error }),
     );
   }
 

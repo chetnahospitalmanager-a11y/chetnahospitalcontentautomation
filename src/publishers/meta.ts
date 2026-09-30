@@ -1,6 +1,6 @@
 import { config } from '../config.ts';
 
-async function graph(path: string, params: Record<string, string>, method: 'GET' | 'POST' = 'POST'): Promise<Record<string, unknown>> {
+export async function graph(path: string, params: Record<string, string>, method: 'GET' | 'POST' = 'POST'): Promise<Record<string, unknown>> {
   const url = new URL(`https://graph.facebook.com/${config.metaGraphVersion}/${path}`);
   const body = new URLSearchParams({ ...params, access_token: config.metaPageAccessToken });
   let res: Response;
