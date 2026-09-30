@@ -1,14 +1,20 @@
 {
-  "_readme": "Edit this file to keep posts accurate. Gemini is only allowed to use the facts written here. A doctor is spotlighted only when 'speciality' is filled in; a department is posted only when it has at least one doctor or a 'brief'. Images go in social-images/ (see social-images/README.md).",
+  "_readme": "Edit this file to keep posts accurate. Gemini is only allowed to use the facts written here. A person is spotlighted only when 'speciality' is filled in and 'spotlight' is not false. A department is posted only when it has at least one doctor or a 'brief'. Images go in social-images/ (see social-images/README.md). Source: Drive sheet 'CHETNA HOSPITAL DOCTORS' (Jan 2026) and chetnahospital.co.in (Dr. Hemant C. Patil).",
   "hospital": {
     "name": "Chetna Hospital",
     "shortName": "Chetna Hospital",
     "location": "Pimpri Chinchwad, Pune",
     "website": "https://chetnahospital.co.in",
-    "hashtags": ["#ChetnaHospital", "#PimpriChinchwad", "#Pune"],
+    "hashtags": [
+      "#ChetnaHospital",
+      "#PimpriChinchwad",
+      "#Pune"
+    ],
     "facts": [
       "Multispeciality hospital in Pimpri Chinchwad, Pune",
       "24x7 emergency services",
+      "19-bedded ICU, including 6 dedicated cardiac ICU beds",
+      "CT scan, MRI, sonography and dialysis available in the hospital",
       "Health check-up packages available"
     ],
     "topics": [
@@ -31,23 +37,234 @@
   },
   "departments": [
     {
-      "slug": "cardiology",
-      "name": "Cardiology",
-      "brief": "Heart care: consultations, diagnosis and treatment of heart conditions."
+      "slug": "general-surgery",
+      "name": "General Surgery",
+      "brief": "Surgical care for common general surgical conditions."
     },
     {
-      "slug": "joint-replacement",
-      "name": "Joint Replacement",
-      "brief": "Knee and hip problems, joint pain and joint replacement surgery."
+      "slug": "obstetrics-gynaecology",
+      "name": "Obstetrics & Gynaecology",
+      "brief": "Pregnancy care, delivery and women's health."
+    },
+    {
+      "slug": "orthopaedics",
+      "name": "Orthopaedics & Spine",
+      "brief": "Bone, joint and spine problems, including spine surgery, joint replacement and foot and ankle surgery."
+    },
+    {
+      "slug": "ophthalmology",
+      "name": "Ophthalmology (Eye Care)",
+      "brief": "Eye care, including cataract and phaco refractive surgery."
+    },
+    {
+      "slug": "dermatology",
+      "name": "Dermatology",
+      "brief": "Skin, hair and nail care, including dermato-surgery."
+    },
+    {
+      "slug": "cardiology",
+      "name": "Cardiology",
+      "brief": "Heart care: consultations, diagnosis and treatment of heart conditions, including 2D echo, stress test and interventional cardiology."
+    },
+    {
+      "slug": "critical-care",
+      "name": "Critical Care",
+      "brief": "Intensive care for critically ill patients in a 19-bedded ICU with 6 dedicated cardiac ICU beds."
+    },
+    {
+      "slug": "neurosurgery",
+      "name": "Neurosurgery",
+      "brief": "Brain and nerve surgery."
+    },
+    {
+      "slug": "nephrology",
+      "name": "Nephrology",
+      "brief": "Kidney care, including dialysis."
+    },
+    {
+      "slug": "interventional-radiology",
+      "name": "Interventional Radiology",
+      "brief": "Image-guided, minimally invasive vascular and non-vascular procedures."
+    },
+    {
+      "slug": "dental",
+      "name": "Dental Care",
+      "brief": "Dental care, including aesthetic and cosmetic dentistry."
+    },
+    {
+      "slug": "physiotherapy",
+      "name": "Physiotherapy",
+      "brief": "Physiotherapy and rehabilitation."
+    },
+    {
+      "slug": "nutrition",
+      "name": "Diet & Nutrition",
+      "brief": "Diet and nutrition counselling."
     }
   ],
   "doctors": [
-    { "slug": "nirmal-patil", "name": "Dr. Nirmal Patil", "qualification": "", "speciality": "", "department": "", "bio": "" },
-    { "slug": "aishwarya-patil-pethe", "name": "Dr. Aishwarya Patil Pethe", "qualification": "", "speciality": "", "department": "", "bio": "" },
-    { "slug": "hemant-patil", "name": "Dr. Hemant Patil", "qualification": "", "speciality": "", "department": "", "bio": "" },
-    { "slug": "bharati-patil", "name": "Dr. Bharati Patil", "qualification": "", "speciality": "", "department": "", "bio": "" },
-    { "slug": "amit-gupte", "name": "Dr. Amit Gupte", "qualification": "", "speciality": "", "department": "", "bio": "" },
-    { "slug": "mahesh-kharade", "name": "Dr. Mahesh Kharade", "qualification": "", "speciality": "", "department": "cardiology", "bio": "" },
-    { "slug": "titar", "name": "Dr. Titar", "qualification": "", "speciality": "", "department": "cardiology", "bio": "" }
+    {
+      "slug": "dhananjay-patil",
+      "name": "Dr. Dhananjay Patil",
+      "qualification": "MS (General Surgery)",
+      "speciality": "General Surgeon",
+      "department": "general-surgery",
+      "bio": "45 years of experience."
+    },
+    {
+      "slug": "nirmal-patil",
+      "name": "Dr. Nirmal Patil",
+      "qualification": "MBBS, MS (Ortho), MRCS (UK), DNB (Ortho), MNAMS, SICOT-Ortho Diploma (Belgium), Advanced Diploma Spine Surgery (UK)",
+      "speciality": "Orthopaedic Spine Surgeon",
+      "department": "orthopaedics",
+      "bio": "10 years of experience."
+    },
+    {
+      "slug": "bharati-patil",
+      "name": "Dr. Bharati Patil",
+      "qualification": "MBBS, DGO",
+      "speciality": "Obstetrician & Gynaecologist",
+      "department": "obstetrics-gynaecology",
+      "bio": "34 years of experience."
+    },
+    {
+      "slug": "rachana-tiwari-patil",
+      "name": "Dr. Rachana Tiwari-Patil",
+      "qualification": "MBBS, MS (Ophthalmology), FCRS ICO (UK)",
+      "speciality": "Ophthalmologist and Phaco Refractive Surgeon",
+      "department": "ophthalmology",
+      "bio": "10 years of experience."
+    },
+    {
+      "slug": "aishwarya-patil-pethe",
+      "name": "Dr. Aishwarya Patil Pethe",
+      "qualification": "MBBS, MD (Dermatology)",
+      "speciality": "Dermatologist, Trichologist and Dermato-Surgeon",
+      "department": "dermatology",
+      "bio": "8 years of experience."
+    },
+    {
+      "slug": "ashpak-bangi",
+      "name": "Dr. Ashpak Bangi",
+      "qualification": "MBBS, MD (Anaesthesia), DNB (Critical Care Medicine)",
+      "speciality": "Physician and Intensivist",
+      "department": "critical-care",
+      "bio": "14 years of experience."
+    },
+    {
+      "slug": "mohnish-dighe",
+      "name": "Dr. Mohnish Dighe",
+      "qualification": "",
+      "speciality": "Consultant Neurosurgeon",
+      "department": "neurosurgery",
+      "bio": "10 years of experience."
+    },
+    {
+      "slug": "sunil-khot",
+      "name": "Dr. Sunil Khot",
+      "qualification": "MBBS, MD, DM (Nephrology)",
+      "speciality": "Consultant Nephrologist",
+      "department": "nephrology",
+      "bio": "12 years of experience."
+    },
+    {
+      "slug": "vishal-bakare",
+      "name": "Dr. Vishal Bakare",
+      "qualification": "MBBS, DNB (Radiodiagnosis), MD (Radiodiagnosis), Fellowship in Vascular and Non-Vascular Interventional Radiology",
+      "speciality": "Consultant Interventional Radiologist",
+      "department": "interventional-radiology",
+      "bio": "12 years of experience."
+    },
+    {
+      "slug": "pritam-titar",
+      "name": "Dr. Pritam Titar",
+      "qualification": "MBBS, MD (Medicine), DNB (Cardiology)",
+      "speciality": "Consultant Interventional Cardiologist",
+      "department": "cardiology",
+      "bio": "12 years of experience."
+    },
+    {
+      "slug": "mahesh-kharade",
+      "name": "Dr. Mahesh Kharade",
+      "qualification": "MBBS, MD (Medicine), DNB (Cardiology)",
+      "speciality": "Consultant Interventional Cardiologist",
+      "department": "cardiology",
+      "bio": "12 years of experience."
+    },
+    {
+      "slug": "rishikesh-more",
+      "name": "Dr. Rishikesh More",
+      "qualification": "MBBS, DNB (Family Medicine), Fellowship in Non-Invasive Cardiology",
+      "speciality": "Consultant Non-Invasive Cardiologist",
+      "department": "cardiology",
+      "bio": "17 years of experience."
+    },
+    {
+      "slug": "hemant-patil",
+      "name": "Dr. Hemant C. Patil",
+      "qualification": "MBBS, D. Ortho, DNB (Ortho), Fellowship in Knee Arthroplasty, Fellowship in Hip and Knee Arthroplasty (Germany)",
+      "speciality": "Joint Replacement Surgeon",
+      "department": "orthopaedics",
+      "bio": ""
+    },
+    {
+      "slug": "kapil-saoji",
+      "name": "Dr. Kapil Saoji",
+      "qualification": "MBBS, MS (Orthopaedics)",
+      "speciality": "Foot and Ankle Surgeon",
+      "department": "orthopaedics",
+      "bio": ""
+    },
+    {
+      "slug": "prashant-gite",
+      "name": "Dr. Prashant Gite",
+      "qualification": "",
+      "speciality": "Consultant Interventional Radiologist",
+      "department": "interventional-radiology",
+      "bio": ""
+    },
+    {
+      "slug": "amit-gupte",
+      "name": "Dr. Amit Gupte",
+      "qualification": "BDS, Fellowship in Aesthetic and Cosmetic Dentistry",
+      "speciality": "Dentist",
+      "department": "dental",
+      "bio": "25 years of experience."
+    },
+    {
+      "slug": "abhay-deosarkar",
+      "name": "Dr. Abhay Deosarkar",
+      "qualification": "BDS",
+      "speciality": "Dentist",
+      "department": "dental",
+      "bio": ""
+    },
+    {
+      "slug": "shruti-gupta",
+      "name": "Dr. Shruti Gupta",
+      "qualification": "Bachelor of Physiotherapy",
+      "speciality": "Physiotherapist",
+      "department": "physiotherapy",
+      "bio": "2 years of experience.",
+      "spotlight": false
+    },
+    {
+      "slug": "sanskruti-kale",
+      "name": "Dr. Sanskruti Kale",
+      "qualification": "Bachelor of Physiotherapy",
+      "speciality": "Physiotherapist",
+      "department": "physiotherapy",
+      "bio": "2 years of experience.",
+      "spotlight": false
+    },
+    {
+      "slug": "komal-bhamare",
+      "name": "Dt. Komal Bhamare",
+      "qualification": "Diploma in Dietetics, Health and Nutrition (DDHN)",
+      "speciality": "Dietitian",
+      "department": "nutrition",
+      "bio": "6 years of experience.",
+      "spotlight": false
+    }
   ]
 }
