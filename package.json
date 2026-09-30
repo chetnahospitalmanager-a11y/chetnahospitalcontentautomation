@@ -1,0 +1,31 @@
+{
+  "name": "chetna-social-automation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chetna Hospital: AI-drafted, human-approved posts to Facebook, Instagram and Google Business Profiles",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "gbp:auth": "node scripts/gbp-auth.mjs",
+    "gbp:locations": "tsx scripts/gbp-locations.ts"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "dotenv": "^17.2.0",
+    "express": "^5.2.1",
+    "node-cron": "^4.6.0",
+    "sharp": "^0.35.5",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.20.4",
+    "typescript": "^5.9.3"
+  }
+}

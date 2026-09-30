@@ -1,0 +1,59 @@
+services:
+  - type: web
+    name: chetna-social
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: TZ_NAME
+        value: Asia/Kolkata
+      - key: DRAFT_CRON
+        value: "0 10 * * 1,3,5"
+      - key: REVIEW_CRON
+        value: "15 8-20/3 * * *"
+      - key: COMMENT_CRON
+        value: "45 8-20/2 * * *"
+      - key: INSIGHTS_CRON
+        value: "0 9 * * 4"
+      - key: REVIEW_CONTACT_LINE
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: APP_PASSWORD
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_AUTH_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: BOOKING_WHATSAPP_NUMBER
+        sync: false
+      - key: BOOKING_PHONE_DISPLAY
+        sync: false
+      - key: META_PAGE_ID
+        sync: false
+      - key: META_PAGE_ACCESS_TOKEN
+        sync: false
+      - key: META_IG_USER_ID
+        sync: false
+      - key: GBP_CLIENT_ID
+        sync: false
+      - key: GBP_CLIENT_SECRET
+        sync: false
+      - key: GBP_REFRESH_TOKEN
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: WATI_API_ENDPOINT
+        sync: false
+      - key: WATI_API_TOKEN
+        sync: false
+      - key: ALERT_PHONES
+        sync: false

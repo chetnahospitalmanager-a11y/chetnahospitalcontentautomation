@@ -1,0 +1,53 @@
+{
+  "_readme": "Edit this file to keep posts accurate. Gemini is only allowed to use the facts written here. A doctor is spotlighted only when 'speciality' is filled in; a department is posted only when it has at least one doctor or a 'brief'. Images go in social-images/ (see social-images/README.md).",
+  "hospital": {
+    "name": "Chetna Hospital",
+    "shortName": "Chetna Hospital",
+    "location": "Pimpri Chinchwad, Pune",
+    "website": "https://chetnahospital.co.in",
+    "hashtags": ["#ChetnaHospital", "#PimpriChinchwad", "#Pune"],
+    "facts": [
+      "Multispeciality hospital in Pimpri Chinchwad, Pune",
+      "24x7 emergency services",
+      "Health check-up packages available"
+    ],
+    "topics": [
+      {
+        "key": "emergency",
+        "label": "24x7 Emergency",
+        "brief": "Our emergency department is open 24x7. Tell people what to do in an emergency and that they can reach us any time."
+      },
+      {
+        "key": "health-packages",
+        "label": "Health check-up packages",
+        "brief": "Encourage preventive health check-ups. Do not quote prices unless they are listed in the facts."
+      },
+      {
+        "key": "about",
+        "label": "About Chetna Hospital",
+        "brief": "Introduce the hospital: multispeciality care in Pimpri Chinchwad with a team of experienced doctors."
+      }
+    ]
+  },
+  "departments": [
+    {
+      "slug": "cardiology",
+      "name": "Cardiology",
+      "brief": "Heart care: consultations, diagnosis and treatment of heart conditions."
+    },
+    {
+      "slug": "joint-replacement",
+      "name": "Joint Replacement",
+      "brief": "Knee and hip problems, joint pain and joint replacement surgery."
+    }
+  ],
+  "doctors": [
+    { "slug": "nirmal-patil", "name": "Dr. Nirmal Patil", "qualification": "", "speciality": "", "department": "", "bio": "" },
+    { "slug": "aishwarya-patil-pethe", "name": "Dr. Aishwarya Patil Pethe", "qualification": "", "speciality": "", "department": "", "bio": "" },
+    { "slug": "hemant-patil", "name": "Dr. Hemant Patil", "qualification": "", "speciality": "", "department": "", "bio": "" },
+    { "slug": "bharati-patil", "name": "Dr. Bharati Patil", "qualification": "", "speciality": "", "department": "", "bio": "" },
+    { "slug": "amit-gupte", "name": "Dr. Amit Gupte", "qualification": "", "speciality": "", "department": "", "bio": "" },
+    { "slug": "mahesh-kharade", "name": "Dr. Mahesh Kharade", "qualification": "", "speciality": "", "department": "cardiology", "bio": "" },
+    { "slug": "titar", "name": "Dr. Titar", "qualification": "", "speciality": "", "department": "cardiology", "bio": "" }
+  ]
+}
