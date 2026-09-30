@@ -43,6 +43,8 @@ services:
         sync: false
       - key: META_IG_USER_ID
         sync: false
+      - key: META_SYSTEM_USER_TOKEN
+        sync: false
       - key: GBP_CLIENT_ID
         sync: false
       - key: GBP_CLIENT_SECRET

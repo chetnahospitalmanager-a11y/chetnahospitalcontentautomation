@@ -22,6 +22,10 @@ export interface Doctor {
   bio: string;
   /** false = listed (e.g. for department posts and Google profile matching) but never spotlighted on its own */
   spotlight?: boolean;
+  /** Other names the doctor's Google profile or Facebook Page might use, e.g. "Dr. Rachana Tiwari". */
+  aliases?: string[];
+  /** Pin the doctor's own Facebook Page instead of matching it by name. */
+  facebookPageId?: string;
 }
 
 export interface HospitalData {

@@ -26,7 +26,11 @@ function tokens(s: string): string[] {
 
 /** How many of the doctor's key name parts (first name + surname) appear in the title; 0 = no match. */
 function score(doctor: Doctor, titleTokens: Set<string>): number {
-  const parts = tokens(doctor.name);
+  return Math.max(...[doctor.name, ...(doctor.aliases ?? [])].map((n) => scoreName(n, titleTokens)));
+}
+
+function scoreName(name: string, titleTokens: Set<string>): number {
+  const parts = tokens(name);
   if (parts.length === 0) return 0;
   const key = parts.length === 1 ? [parts[0]] : [parts[0], parts[parts.length - 1]];
   if (!key.every((k) => titleTokens.has(k))) return 0;

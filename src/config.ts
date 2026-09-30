@@ -77,6 +77,13 @@ export const config = {
   get metaIgUserId() {
     return str('META_IG_USER_ID');
   },
+  /**
+   * Optional: the business portfolio's system-user token. With it, doctors' own Facebook Pages (and their linked
+   * Instagram accounts) that the system user can manage are found automatically and receive their posts too.
+   */
+  get metaSystemUserToken() {
+    return str('META_SYSTEM_USER_TOKEN');
+  },
   get metaGraphVersion() {
     return str('META_GRAPH_VERSION', 'v23.0');
   },
