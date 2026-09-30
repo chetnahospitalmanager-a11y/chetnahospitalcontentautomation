@@ -44,8 +44,9 @@ button.primary{background:var(--brand);color:#fff;border-color:var(--brand)}butt
 pre{white-space:pre-wrap;word-break:break-word;background:#f7fafa;border:1px solid var(--line);border-radius:8px;padding:8px;margin:0;font:14px/1.45 system-ui,sans-serif}
 ul{padding-left:20px;margin:6px 0}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:6px;border-bottom:1px solid var(--line);font-size:.95rem}
 details summary{cursor:pointer;color:var(--brand);font-weight:600}
+@media(max-width:480px){header .brand{display:none}header{gap:8px}}
 </style></head><body>
-<header><nav style="display:flex;gap:16px;align-items:center"><a href="/">Chetna Social</a>${opts.loggedIn ? '<a href="/" style="font-weight:400">Posts</a><a href="/reviews" style="font-weight:400">Reviews</a>' : ''}</nav>${opts.loggedIn ? '<form method="post" action="/logout" style="margin:0"><button style="padding:4px 10px">Log out</button></form>' : ''}</header>
+<header><nav style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><a href="/" class="brand">Chetna Social</a>${opts.loggedIn ? '<a href="/" style="font-weight:400">Posts</a><a href="/reviews" style="font-weight:400">Reviews</a><a href="/insights" style="font-weight:400">Insights</a>' : ''}</nav>${opts.loggedIn ? '<form method="post" action="/logout" style="margin:0"><button style="padding:4px 10px">Log out</button></form>' : ''}</header>
 <main>${body}</main></body></html>`;
 }
 

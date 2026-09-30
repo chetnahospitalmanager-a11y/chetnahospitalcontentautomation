@@ -64,6 +64,13 @@ export function initDb(): Promise<void> {
             updated_at TEXT NOT NULL
           )`,
           `CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+          `CREATE TABLE IF NOT EXISTS reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            week_start TEXT NOT NULL UNIQUE,
+            week_end TEXT NOT NULL,
+            data TEXT NOT NULL,
+            created_at TEXT NOT NULL
+          )`,
           `CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             review_name TEXT NOT NULL UNIQUE,
@@ -317,4 +324,59 @@ export async function transitionReview(id: number, from: ReviewStatus[], to: Rev
     args: [to, new Date().toISOString(), id, ...from],
   });
   return res.rowsAffected === 1;
+}
+
+// ---------------------------------------------------------------- Weekly insights reports
+
+export interface ReportRow<T = unknown> {
+  id: number;
+  weekStart: string;
+  weekEnd: string;
+  data: T;
+  createdAt: string;
+}
+
+function rowToReport<T>(r: Record<string, unknown>): ReportRow<T> {
+  return {
+    id: Number(r.id),
+    weekStart: String(r.week_start),
+    weekEnd: String(r.week_end),
+    data: JSON.parse(String(r.data)) as T,
+    createdAt: String(r.created_at),
+  };
+}
+
+/** Saves the report for a week, replacing an earlier one for the same week. */
+export async function saveReport<T>(weekStart: string, weekEnd: string, data: T): Promise<ReportRow<T>> {
+  await initDb();
+  const res = await db().execute({
+    sql: `INSERT INTO reports (week_start, week_end, data, created_at) VALUES (?, ?, ?, ?)
+          ON CONFLICT(week_start) DO UPDATE SET week_end = excluded.week_end, data = excluded.data, created_at = excluded.created_at
+          RETURNING *`,
+    args: [weekStart, weekEnd, JSON.stringify(data), new Date().toISOString()],
+  });
+  return rowToReport<T>(res.rows[0] as Record<string, unknown>);
+}
+
+export async function getReport<T>(id: number): Promise<ReportRow<T> | null> {
+  await initDb();
+  const res = await db().execute({ sql: 'SELECT * FROM reports WHERE id = ?', args: [id] });
+  return res.rows[0] ? rowToReport<T>(res.rows[0] as Record<string, unknown>) : null;
+}
+
+export async function listReports<T>(limit = 26): Promise<ReportRow<T>[]> {
+  await initDb();
+  const res = await db().execute({ sql: 'SELECT * FROM reports ORDER BY week_start DESC LIMIT ?', args: [limit] });
+  return res.rows.map((r) => rowToReport<T>(r as Record<string, unknown>));
+}
+
+/** Counts of our own activity between two instants (ISO strings). */
+export async function activityBetween(from: string, to: string): Promise<{ postsPublished: number; repliesPosted: number; reviewsWaiting: number }> {
+  await initDb();
+  const [posts, replies, waiting] = await Promise.all([
+    db().execute({ sql: "SELECT COUNT(*) AS n FROM posts WHERE status IN ('published','partial') AND updated_at >= ? AND updated_at < ?", args: [from, to] }),
+    db().execute({ sql: "SELECT COUNT(*) AS n FROM reviews WHERE status = 'replied' AND updated_at >= ? AND updated_at < ?", args: [from, to] }),
+    db().execute("SELECT COUNT(*) AS n FROM reviews WHERE status IN ('draft','failed')"),
+  ]);
+  return { postsPublished: Number(posts.rows[0].n), repliesPosted: Number(replies.rows[0].n), reviewsWaiting: Number(waiting.rows[0].n) };
 }

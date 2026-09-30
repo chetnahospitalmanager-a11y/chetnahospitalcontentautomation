@@ -137,6 +137,62 @@ export async function replyToReview(reviewName: string, comment: string): Promis
   });
 }
 
+export interface CivilDate {
+  year: number;
+  month: number;
+  day: number;
+}
+
+/** "2026-09-28" ↔ {year, month, day} */
+export const toCivil = (iso: string): CivilDate => {
+  const [year, month, day] = iso.split('-').map(Number);
+  return { year, month, day };
+};
+const fromCivil = (d: CivilDate) => `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+
+/**
+ * Daily Business Profile Performance metrics (needs the "Business Profile Performance API" enabled).
+ * Returns metric → date ("YYYY-MM-DD") → value. Days Google leaves out are zero.
+ */
+export async function fetchDailyMetrics(
+  loc: GbpLocation,
+  metrics: string[],
+  start: string,
+  end: string,
+): Promise<Record<string, Record<string, number>>> {
+  const q = new URLSearchParams();
+  for (const m of metrics) q.append('dailyMetrics', m);
+  const s = toCivil(start);
+  const e = toCivil(end);
+  q.set('dailyRange.startDate.year', String(s.year));
+  q.set('dailyRange.startDate.month', String(s.month));
+  q.set('dailyRange.startDate.day', String(s.day));
+  q.set('dailyRange.endDate.year', String(e.year));
+  q.set('dailyRange.endDate.month', String(e.month));
+  q.set('dailyRange.endDate.day', String(e.day));
+  const r = await google<{
+    multiDailyMetricTimeSeries?: {
+      dailyMetricTimeSeries?: { dailyMetric: string; timeSeries?: { datedValues?: { date: CivilDate; value?: string }[] } }[];
+    }[];
+  }>(`https://businessprofileperformance.googleapis.com/v1/${loc.name}:fetchMultiDailyMetricsTimeSeries?${q}`);
+  const out: Record<string, Record<string, number>> = Object.fromEntries(metrics.map((m) => [m, {}]));
+  for (const group of r.multiDailyMetricTimeSeries ?? []) {
+    for (const series of group.dailyMetricTimeSeries ?? []) {
+      const bucket = (out[series.dailyMetric] ??= {});
+      for (const dv of series.timeSeries?.datedValues ?? []) bucket[fromCivil(dv.date)] = Number(dv.value ?? 0);
+    }
+  }
+  return out;
+}
+
+/** Current overall rating and review count shown on the profile. */
+export async function reviewStats(loc: GbpLocation): Promise<{ averageRating: number | null; totalReviews: number }> {
+  const r = await google<{ averageRating?: number; totalReviewCount?: number }>(
+    `https://mybusiness.googleapis.com/v4/${loc.account}/${loc.name}/reviews?pageSize=1`,
+  );
+  return { averageRating: r.averageRating ?? null, totalReviews: r.totalReviewCount ?? 0 };
+}
+
 export async function createLocalPost(loc: GbpLocation, summary: string, imageUrl: string, bookUrl: string): Promise<string> {
   const body: Record<string, unknown> = {
     languageCode: 'en',

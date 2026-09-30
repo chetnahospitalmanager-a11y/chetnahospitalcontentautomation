@@ -3,7 +3,7 @@ import { gbpSummary, reviseCaption, socialCaption, writeCaption } from './captio
 import { complianceWarnings } from './compliance.ts';
 import { getPost, insertPost, listPosts, transitionPost, updatePost, type Post, type PublishResult } from './db.ts';
 import { doctorsInDepartment, findDoctor } from './hospital.ts';
-import { alertDraftReady } from './notify.ts';
+import { sendAlert } from './notify.ts';
 import { postToFacebook, postToInstagram } from './publishers/meta.ts';
 import { createLocalPost, getMatch } from './publishers/gbp.ts';
 import type { GbpLocation } from './gbpMatch.ts';
@@ -29,7 +29,7 @@ export async function createDraft(topic: Topic): Promise<Post> {
     imageKey: topic.imageKey,
     warnings: complianceWarnings(caption),
   });
-  if (config.publicBaseUrl) await alertDraftReady(post.title, `${config.publicBaseUrl}/posts/${post.id}`);
+  if (config.publicBaseUrl) await sendAlert(`New post draft ready for approval: ${post.title}`, `${config.publicBaseUrl}/posts/${post.id}`);
   return post;
 }
 

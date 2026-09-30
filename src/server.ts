@@ -4,6 +4,7 @@ import { initDb } from './db.ts';
 import { createApp } from './web/app.ts';
 import { createScheduledDraft, recoverInterruptedPublishes } from './workflow.ts';
 import { recoverInterruptedReplies, syncReviews } from './reviews.ts';
+import { generateWeeklyReport } from './insights.ts';
 
 await initDb();
 await recoverInterruptedPublishes();
@@ -40,4 +41,17 @@ if (config.reviewCron.trim() && gbpEnabled()) {
     { timezone: config.timezone },
   );
   console.log(`[reviews] checking Google reviews on "${config.reviewCron}" (${config.timezone})`);
+}
+
+if (config.insightsCron.trim() && gbpEnabled()) {
+  cron.schedule(
+    config.insightsCron,
+    () => {
+      generateWeeklyReport({ alert: true })
+        .then((r) => console.log(`[insights] weekly report #${r.id} for ${r.weekStart}`))
+        .catch((err) => console.error('[insights] report failed:', err));
+    },
+    { timezone: config.timezone },
+  );
+  console.log(`[insights] weekly report on "${config.insightsCron}" (${config.timezone})`);
 }

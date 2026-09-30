@@ -1,7 +1,8 @@
 # Chetna Hospital: social media & Google Business Profile automation
 
-A small standalone service, separate from the WhatsApp booking bot, with two jobs:
-**posting** (below) and **answering Google reviews** (see [Google review replies](#google-review-replies)).
+A small standalone service, separate from the WhatsApp booking bot, with three jobs:
+**posting** (below), **answering Google reviews** (see [Google review replies](#google-review-replies))
+and a **weekly Google insights report** (see [Weekly insights report](#weekly-insights-report)).
 
 For posting, it:
 
@@ -73,6 +74,28 @@ posted automatically.**
 It needs the same Google setup as posting (step 3 below); nothing extra. On Render's free plan, also
 add a cron-job.org job for `POST /cron/reviews` (see step 4).
 
+## Weekly insights report
+
+Every Thursday at 09:00 IST the service builds a report for the previous Monday–Sunday week (Google's
+numbers take a few days to settle, hence Thursday) and shows it on the **Insights** page:
+
+- **Totals across all profiles** with the change from the week before: profile views (Google Search +
+  Maps), calls, direction requests and website clicks.
+- **One row per profile** (hospital first, then doctors by calls): the same four numbers, the current
+  rating and total reviews, and how many new reviews arrived that week.
+- **What stands out:** plain observations worked out from the numbers, not by AI, so nothing is
+  invented: which doctor got the most calls, profiles whose views fell or grew by 25%+, ratings below
+  4.0, new reviews vs replies still waiting, and posts published that week.
+- **Download CSV** for Excel/Google Sheets, and **Past weeks** to look back.
+- Optional WhatsApp alert with the headline numbers and a link.
+
+"Build latest week's report now" rebuilds it on demand; rebuilding a week replaces it rather than adding a
+duplicate. If one profile can't be read, the report still builds and names that profile.
+
+It uses the same Google sign-in as posting, plus one more API to enable: **Business Profile
+Performance API** (step 3 below). On Render's free plan, add a cron-job.org job for
+`POST /cron/insights` (step 4).
+
 ### Code map
 
 | File | What it does |
@@ -87,6 +110,7 @@ add a cron-job.org job for `POST /cron/reviews` (see step 4).
 | `src/workflow.ts` | Draft → approve → publish, retry of failed channels |
 | `src/web/*` | Approval page (password login, CSRF + same-origin checks) |
 | `src/reviews.ts`, `src/web/reviewViews.ts` | Review sync, reply drafts, posting replies, Reviews page |
+| `src/insights.ts`, `src/web/insightViews.ts` | Weekly report: Google Performance numbers, highlights, CSV, Insights page |
 | `src/notify.ts` | Optional send-only WhatsApp alert through WATI |
 | `scripts/gbp-auth.mjs` | One-time Google sign-in; saves the refresh token into `.env` without printing it |
 | `scripts/gbp-locations.ts` | Read-only check of which profile matched which doctor |
@@ -129,7 +153,8 @@ You are an admin of your own Page, so posting to it works without Meta's full ap
    Gmail that owns or manages the profiles. Use case: *"Hospital managing its own 14 verified
    profiles (hospital + doctors): scheduled posts, review replies, consistent hours."*
 2. After approval, in Google Cloud enable **My Business Account Management API**, **My Business
-   Business Information API** and **Google My Business API**.
+   Business Information API**, **Google My Business API** and **Business Profile Performance API**
+   (the last one is for the weekly report).
 3. Create an OAuth client of type **Desktop app**. Put its ID/secret in `.env` as `GBP_CLIENT_ID` /
    `GBP_CLIENT_SECRET`.
 4. On the OAuth consent screen, set the publishing status to **In production**. In "Testing" the
@@ -151,15 +176,17 @@ You are an admin of your own Page, so posting to it works without Meta's full ap
    `MAX_PENDING_DRAFTS` waiting drafts, so the two schedules can't pile up duplicates.
    Add a second job, `POST https://<your-app>/cron/reviews` with the same header, every 3 hours
    during the day, so new reviews are fetched even while the service is asleep.
+   And a third, `POST https://<your-app>/cron/insights`, Thursdays 09:00 IST, for the weekly report.
 
-### 5. Optional: WhatsApp alert when a draft is ready
-Submit a WATI template `chetna_bot_social_draft_ready_mkt` with the text
-*"New post draft ready for approval: {{1}}. Review it here: {{2}}"*, then set `WATI_API_ENDPOINT`,
-`WATI_API_TOKEN` and `ALERT_PHONES`. This service only sends alerts, never receives WhatsApp
-messages, so it stays separate from the booking bot.
+### 5. Optional: WhatsApp alerts
+One WATI template covers all alerts (a draft is waiting, new reviews to answer, the weekly report).
+Submit `chetna_social_update` (category Utility) with the text
+*"Chetna Social update: {{1}}. Open: {{2}}"*, then set `WATI_API_ENDPOINT`, `WATI_API_TOKEN` and
+`ALERT_PHONES`. This service only sends alerts, never receives WhatsApp messages, so it stays
+separate from the booking bot.
 
 ### 6. First live test
 Create one draft, approve it, and check it appears on Facebook, Instagram and the Google profiles.
 
 ## Not built yet
-- Weekly Google profile insights report (calls, directions, website clicks per profile).
+- Facebook/Instagram numbers in the weekly report (needs the `read_insights` / `instagram_manage_insights` permissions).

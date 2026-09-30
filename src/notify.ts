@@ -1,11 +1,12 @@
 import { config } from './config.ts';
 
 /**
- * Optional, send-only WhatsApp alert through WATI: "a draft is waiting". Approval itself happens on the
- * web page, so this service never receives WhatsApp messages and stays separate from the booking bot.
- * Template text (submit in WATI): "New post draft ready for approval: {{1}}. Review it here: {{2}}"
+ * Optional, send-only WhatsApp alert through WATI (a draft is waiting, new reviews, weekly report).
+ * Everything else happens on the web page, so this service never receives WhatsApp messages and stays
+ * separate from the booking bot.
+ * Template text (submit in WATI, category Utility): "Chetna Social update: {{1}}. Open: {{2}}"
  */
-export async function alertDraftReady(title: string, reviewUrl: string): Promise<void> {
+export async function sendAlert(title: string, url: string): Promise<void> {
   if (!config.watiApiEndpoint || !config.watiApiToken || config.alertPhones.length === 0) return;
   for (const phone of config.alertPhones) {
     try {
@@ -16,10 +17,10 @@ export async function alertDraftReady(title: string, reviewUrl: string): Promise
           headers: { authorization: `Bearer ${config.watiApiToken}`, 'content-type': 'application/json' },
           body: JSON.stringify({
             template_name: config.watiTemplateName,
-            broadcast_name: 'social_draft_ready',
+            broadcast_name: 'chetna_social_update',
             parameters: [
               { name: '1', value: title.slice(0, 200) },
-              { name: '2', value: reviewUrl },
+              { name: '2', value: url },
             ],
           }),
           signal: AbortSignal.timeout(15_000),

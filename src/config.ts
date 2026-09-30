@@ -114,6 +114,16 @@ export const config = {
     return str('REVIEW_CONTACT_LINE');
   },
 
+  // Weekly insights report
+  /** When to build the weekly report. Default: Thursday 09:00 (Google's numbers lag a few days). Empty disables. */
+  get insightsCron() {
+    return process.env.INSIGHTS_CRON ?? '0 9 * * 4';
+  },
+  /** Google's performance numbers are complete only after a few days; the report covers the last Mon–Sun week ending at least this many days ago. */
+  get insightsLagDays() {
+    return Number(str('INSIGHTS_LAG_DAYS', '3'));
+  },
+
   // Optional WhatsApp alert (send-only) via WATI when a draft is ready
   get watiApiEndpoint() {
     return str('WATI_API_ENDPOINT').replace(/\/+$/, '');
@@ -122,7 +132,7 @@ export const config = {
     return str('WATI_API_TOKEN');
   },
   get watiTemplateName() {
-    return str('WATI_DRAFT_TEMPLATE', 'chetna_bot_social_draft_ready_mkt');
+    return str('WATI_TEMPLATE', 'chetna_social_update');
   },
   get alertPhones() {
     return list('ALERT_PHONES').map((p) => p.replace(/\D/g, ''));

@@ -11,7 +11,7 @@ import {
   updateReview,
   type ReviewRow,
 } from './db.ts';
-import { alertDraftReady } from './notify.ts';
+import { sendAlert } from './notify.ts';
 import { listLocations, listReviews, replyToReview } from './publishers/gbp.ts';
 
 export interface SyncSummary {
@@ -102,7 +102,7 @@ async function doSync(): Promise<SyncSummary> {
 
   await setKv('reviews:lastSync', JSON.stringify(summary));
   if (summary.newReviews > 0 && config.publicBaseUrl) {
-    await alertDraftReady(`${summary.newReviews} new Google review${summary.newReviews === 1 ? '' : 's'} to reply to`, `${config.publicBaseUrl}/reviews`);
+    await sendAlert(`${summary.newReviews} new Google review${summary.newReviews === 1 ? '' : 's'} to reply to`, `${config.publicBaseUrl}/reviews`);
   }
   return summary;
 }

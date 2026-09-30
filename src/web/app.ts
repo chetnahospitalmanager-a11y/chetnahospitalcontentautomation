@@ -1,8 +1,10 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { config, gbpEnabled } from '../config.ts';
-import { getKv, getPost, getReview, listPosts, listReviewRows, type PostKind } from '../db.ts';
+import { getKv, getPost, getReport, getReview, listPosts, listReports, listReviewRows, type PostKind } from '../db.ts';
 import { draftReply, postReply, reviseReply, saveReply, skipReview, syncReviews, type SyncSummary } from '../reviews.ts';
 import { reviewsPage } from './reviewViews.ts';
+import { insightsPage } from './insightViews.ts';
+import { generateWeeklyReport, reportCsv, type WeeklyReport } from '../insights.ts';
 import { renderPostImage } from '../images.ts';
 import { nextTopic, topicFor } from '../topics.ts';
 import { approveAndPublish, createDraft, createScheduledDraft, describeTargets, requestChanges, saveCaption, skip } from '../workflow.ts';
@@ -35,6 +37,7 @@ const FLASH: Record<string, string> = {
   reply_drafted: 'Reply drafted. Check it before posting.',
   review_skipped: 'Marked as not needing a reply.',
   synced: 'Checked Google for new reviews.',
+  report_built: 'Report built.',
 };
 
 type Handler = (req: Request, res: Response) => Promise<void>;
@@ -113,6 +116,18 @@ export function createApp() {
         return;
       }
       res.json({ ok: true, summary: await syncReviews() });
+    }),
+  );
+
+  app.post(
+    '/cron/insights',
+    wrap(async (req, res) => {
+      if (!secretMatches(req.header('x-cron-secret'), config.cronSecret)) {
+        res.status(403).json({ ok: false });
+        return;
+      }
+      const r = await generateWeeklyReport({ alert: true });
+      res.json({ ok: true, report: r.id, week: r.weekStart });
     }),
   );
 
@@ -330,6 +345,58 @@ export function createApp() {
       if (r?.warnings.length && req.body.confirm !== 'yes') throw new Error('Tick "I have checked the wording" first');
       const after = await postReply(id);
       return after.status === 'replied' ? 'replied' : 'reply_failed';
+    }),
+  );
+
+  // ---------------------------------------------------------------- Weekly insights
+
+  async function renderInsights(req: Request, res: Response, id: number | null, extra: { error?: string; status?: number } = {}) {
+    const history = await listReports<WeeklyReport>();
+    const report = id === null ? (history[0] ?? null) : await getReport<WeeklyReport>(id);
+    if (id !== null && !report) {
+      res.status(404).send('Report not found');
+      return;
+    }
+    res.status(extra.status ?? 200).send(
+      insightsPage({ report, history, gbpConnected: gbpEnabled(), csrf: csrfToken(req), flash: FLASH[String(req.query.ok ?? '')], error: extra.error }),
+    );
+  }
+
+  app.get(
+    '/insights',
+    wrap(async (req, res) => {
+      await renderInsights(req, res, null);
+    }),
+  );
+  app.get(
+    '/insights/:id.csv',
+    wrap(async (req, res) => {
+      const report = await getReport<WeeklyReport>(postId(req));
+      if (!report) {
+        res.status(404).send('Report not found');
+        return;
+      }
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="chetna-google-insights-${report.weekStart}.csv"`);
+      res.send(`\uFEFF${reportCsv(report.data)}`); // BOM so Excel reads UTF-8
+    }),
+  );
+  app.get(
+    '/insights/:id',
+    wrap(async (req, res) => {
+      await renderInsights(req, res, postId(req));
+    }),
+  );
+  app.post(
+    '/insights/generate',
+    requireCsrf,
+    wrap(async (req, res) => {
+      try {
+        const r = await generateWeeklyReport();
+        res.redirect(303, `/insights/${r.id}?ok=report_built`);
+      } catch (err) {
+        await renderInsights(req, res, null, { error: (err as Error).message, status: 400 });
+      }
     }),
   );
 
