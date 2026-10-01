@@ -8,6 +8,7 @@ import { commentsPage } from './commentViews.ts';
 import { connectionsPage, type ConnectionsInfo } from './connectionsView.ts';
 import { doctorPagesEnabled, getDoctorPages } from '../publishers/metaPages.ts';
 import { graph } from '../publishers/meta.ts';
+import { getMatch, listLocations } from '../publishers/gbp.ts';
 import { loadHospital } from '../hospital.ts';
 import {
   draftCommentReply,
@@ -392,7 +393,22 @@ export function createApp() {
         doctors: [],
         doctorPagesEnabled: doctorPagesEnabled(),
         problems: [],
+        google: { connected: gbpEnabled(), profileCount: 0, hospital: null, doctors: [], problems: [] },
       };
+      if (info.google.connected) {
+        try {
+          const [locations, match] = [await listLocations(), await getMatch(true)];
+          info.google.profileCount = locations.length;
+          info.google.hospital = match.hospital ? match.hospital.title : null;
+          for (const d of loadHospital().doctors) {
+            const loc = match.byDoctor.get(d.slug);
+            if (loc) info.google.doctors.push({ doctor: d.name, profile: loc.title });
+          }
+          info.google.problems = match.problems;
+        } catch (err) {
+          info.google.error = `Could not read Google Business Profiles: ${(err as Error).message}`;
+        }
+      }
       if (metaEnabled()) {
         try {
           const p = (await graph(config.metaPageId, { fields: 'name,instagram_business_account{username}' }, 'GET')) as {

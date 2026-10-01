@@ -222,13 +222,17 @@ labelled with the doctor's name, and replies/hides are made as that Page) and by
 2. After approval, in Google Cloud enable **My Business Account Management API**, **My Business
    Business Information API**, **Google My Business API** and **Business Profile Performance API**
    (the last one is for the weekly report).
-3. Create an OAuth client of type **Desktop app**. Put its ID/secret in `.env` as `GBP_CLIENT_ID` /
-   `GBP_CLIENT_SECRET`.
-4. On the OAuth consent screen, set the publishing status to **In production**. In "Testing" the
-   sign-in expires after 7 days and posting stops without warning.
-5. `npm run gbp:auth` and sign in with the Gmail that owns the profiles, or with an account added as
-   **Manager** on all of them. This saves `GBP_REFRESH_TOKEN` into `.env`.
-6. `npm run gbp:locations` shows every profile and which doctor it matched. Fix names in
+3. On the **OAuth consent screen**, choose **External**, then set the publishing status to **In production**.
+   In "Testing" the sign-in expires after 7 days and posting stops without warning.
+4. Create an OAuth client and get a refresh token. No coding is needed:
+   - **Credentials → Create credentials → OAuth client ID → Web application**, with the authorized redirect URI
+     `https://developers.google.com/oauthplayground`. Keep the Client ID and secret.
+   - Open https://developers.google.com/oauthplayground → ⚙ → **Use your own OAuth credentials** → paste them.
+     Scope: `https://www.googleapis.com/auth/business.manage` → **Authorize APIs** → sign in with the Gmail that
+     owns (or manages) the profiles → **Exchange authorization code for tokens** → copy the **refresh token**.
+   - (Developers can instead use a **Desktop app** client and run `npm run gbp:auth`, which writes the token to `.env`.)
+5. On Render set `GBP_CLIENT_ID`, `GBP_CLIENT_SECRET` and `GBP_REFRESH_TOKEN`.
+6. The **Connections** page (or `npm run gbp:locations` locally) shows every profile and which doctor it matched. Fix names in
    `data/hospital.json` (or set `GBP_HOSPITAL_LOCATION`) until everything matches.
 
 ### 4. Deploy on Render (free)
