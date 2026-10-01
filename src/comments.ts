@@ -13,6 +13,7 @@ import {
   type CommentRow,
 } from './db.ts';
 import { loadHospital } from './hospital.ts';
+import { doctorPagesEnabled, getDoctorPages } from './publishers/metaPages.ts';
 import { sendAlert } from './notify.ts';
 import { facebookComments, hideComment, instagramComments, replyToComment, type FetchedComment } from './publishers/metaComments.ts';
 
@@ -109,6 +110,29 @@ async function doSync(): Promise<CommentSyncSummary> {
 
   const sources: [string, () => Promise<FetchedComment[]>][] = [['Facebook', () => facebookComments(postsSince, commentsSince)]];
   if (instagramEnabled()) sources.push(['Instagram', () => instagramComments(postsSince, commentsSince)]);
+  // Doctors' own Pages and Instagram accounts, read with each Page's own token.
+  if (doctorPagesEnabled()) {
+    try {
+      const pages = await getDoctorPages();
+      for (const d of loadHospital().doctors) {
+        const acc = pages.byDoctor.get(d.slug);
+        if (!acc || !acc.token) continue;
+        sources.push([
+          `Facebook (${d.name})`,
+          () => facebookComments(postsSince, commentsSince, { id: acc.pageId, token: acc.token, account: acc.pageId, accountLabel: d.name }),
+        ]);
+        if (acc.igUserId) {
+          const igUserId = acc.igUserId;
+          sources.push([
+            `Instagram (${d.name})`,
+            () => instagramComments(postsSince, commentsSince, { id: igUserId, token: acc.token, account: igUserId, accountLabel: d.name }),
+          ]);
+        }
+      }
+    } catch (err) {
+      s.errors.push(`Doctors' Pages: ${(err as Error).message}`);
+    }
+  }
 
   const alertWorthy: string[] = [];
   for (const [label, fetchAll] of sources) {
@@ -157,6 +181,16 @@ async function doSync(): Promise<CommentSyncSummary> {
   return s;
 }
 
+/** The Page token to act with: the hospital's, or the doctor's Page the comment was made on. */
+async function tokenFor(c: CommentRow): Promise<string> {
+  if (!c.account) return config.metaPageAccessToken;
+  const pages = await getDoctorPages();
+  for (const acc of pages.byDoctor.values()) {
+    if (acc.token && (acc.pageId === c.account || acc.igUserId === c.account)) return acc.token;
+  }
+  throw new Error(`${c.accountLabel || 'This doctor'}'s Page is no longer connected (check the Connections page)`);
+}
+
 async function mustBeOpen(id: number): Promise<CommentRow> {
   const c = await getComment(id);
   if (!c) throw new Error('Comment not found');
@@ -189,7 +223,7 @@ export async function postCommentReply(id: number): Promise<CommentRow> {
   if (!c.reply.trim()) throw new Error('Write or generate a reply first');
   if (!(await transitionComment(id, ['draft', 'failed'], 'posting'))) throw new Error('This reply is already being posted');
   try {
-    await replyToComment(c.platform, c.commentId, c.reply);
+    await replyToComment(c.platform, c.commentId, c.reply, await tokenFor(c));
     await updateComment(id, { status: 'replied', error: '' });
   } catch (err) {
     await updateComment(id, { status: 'failed', error: (err as Error).message.slice(0, 500) });
@@ -199,7 +233,7 @@ export async function postCommentReply(id: number): Promise<CommentRow> {
 
 export async function hideCommentById(id: number): Promise<void> {
   const c = await mustBeOpen(id);
-  await hideComment(c.platform, c.commentId);
+  await hideComment(c.platform, c.commentId, await tokenFor(c));
   await updateComment(id, { status: 'hidden', error: '' });
 }
 

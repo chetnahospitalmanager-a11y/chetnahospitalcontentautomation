@@ -32,7 +32,7 @@ ${c.warnings.length ? '<label class="row"><input type="checkbox" name="confirm" 
     : `<form method="post" action="/comments/${c.id}/draft">${hidden}<div class="row"><button class="primary">Write a reply with Gemini</button><span class="muted">${c.category ? 'No reply suggested.' : 'Not drafted yet.'}</span></div></form>`;
 
   return `<div class="card" id="c${c.id}" style="${urgent ? 'border-left:4px solid var(--bad)' : ''}">
-<div class="row" style="justify-content:space-between;margin-top:0"><div><span class="badge">${platform}</span> ${cat} <strong>${esc(c.author)}</strong> <span class="muted">· ${esc(when(c.commentedAt))}</span></div>${badge(c.status)}</div>
+<div class="row" style="justify-content:space-between;margin-top:0"><div><span class="badge">${platform}${c.accountLabel ? ` · ${esc(c.accountLabel)}` : ''}</span> ${cat} <strong>${esc(c.author)}</strong> <span class="muted">· ${esc(when(c.commentedAt))}</span></div>${badge(c.status)}</div>
 ${c.category === 'emergency' ? '<p class="err" style="margin:8px 0">Possible emergency: reply now, and consider calling or messaging the person if they can be reached.</p>' : ''}
 ${c.error ? `<p class="err" style="margin:8px 0">${esc(c.error)}</p>` : ''}
 <p class="muted" style="margin:8px 0 4px">On post: ${c.postUrl ? `<a href="${esc(c.postUrl)}" target="_blank" rel="noopener noreferrer">${esc(c.postText || '(no caption)')}</a>` : esc(c.postText || '(no caption)')}</p>
@@ -66,7 +66,7 @@ export function commentsPage(opts: {
   const rows = opts.recent
     .map(
       (c) =>
-        `<tr><td>${c.platform === 'facebook' ? 'Facebook' : 'Instagram'} · ${esc(c.author)}<br><span class="muted">${esc(c.text.slice(0, 70))}${c.text.length > 70 ? '…' : ''}</span></td><td>${badge(c.status)}</td><td class="muted">${esc(c.reply.slice(0, 80))}${c.reply.length > 80 ? '…' : ''}</td></tr>`,
+        `<tr><td>${c.platform === 'facebook' ? 'Facebook' : 'Instagram'}${c.accountLabel ? ` (${esc(c.accountLabel)})` : ''} · ${esc(c.author)}<br><span class="muted">${esc(c.text.slice(0, 70))}${c.text.length > 70 ? '…' : ''}</span></td><td>${badge(c.status)}</td><td class="muted">${esc(c.reply.slice(0, 80))}${c.reply.length > 80 ? '…' : ''}</td></tr>`,
     )
     .join('');
 

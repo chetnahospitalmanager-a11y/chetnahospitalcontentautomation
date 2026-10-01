@@ -210,7 +210,9 @@ department post to the Pages of the doctors in it. Hospital-wide posts stay on t
    `data/hospital.json`; set `facebookPageId` on a doctor to pin a Page exactly. The approval page also
    lists every Page a draft will go to before you approve it.
 
-Comments and the weekly report still cover the hospital's own Page and Instagram only.
+The same accounts are also covered by **comment replies** (comments on a doctor's Page or Instagram are
+labelled with the doctor's name, and replies/hides are made as that Page) and by the **weekly report**
+(a Facebook and an Instagram section per doctor). The WhatsApp alert's headline numbers stay hospital-only.
 
 ### 3. Google Business Profiles (14 profiles, 1 Gmail)
 1. **Request API access first; it can take weeks.** Search for "Business Profile API access

@@ -108,9 +108,24 @@ export function initDb(): Promise<void> {
         ],
         'write',
       )
-      .then(() => undefined);
+      .then(() => migrate());
   }
   return ready;
+}
+
+/** Columns added after the first release. SQLite has no "ADD COLUMN IF NOT EXISTS", so ignore "duplicate column". */
+async function migrate(): Promise<void> {
+  const add = [
+    "ALTER TABLE comments ADD COLUMN account TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE comments ADD COLUMN account_label TEXT NOT NULL DEFAULT ''",
+  ];
+  for (const sql of add) {
+    try {
+      await db().execute(sql);
+    } catch (err) {
+      if (!/duplicate column/i.test((err as Error).message)) throw err;
+    }
+  }
 }
 
 function rowToPost(r: Record<string, unknown>): Post {
@@ -420,6 +435,9 @@ export interface CommentRow {
   id: number;
   platform: CommentPlatform;
   commentId: string;
+  /** '' = hospital's own account; otherwise the doctor's Page id (Facebook) or Instagram user id */
+  account: string;
+  accountLabel: string;
   postText: string;
   postUrl: string;
   author: string;
@@ -440,6 +458,8 @@ function rowToComment(r: Record<string, unknown>): CommentRow {
     id: Number(r.id),
     platform: r.platform as CommentPlatform,
     commentId: String(r.comment_id),
+    account: String(r.account ?? ''),
+    accountLabel: String(r.account_label ?? ''),
     postText: String(r.post_text),
     postUrl: String(r.post_url),
     author: String(r.author),
@@ -487,6 +507,8 @@ export async function listCommentRows(opts: { status?: CommentStatus[]; limit?: 
 export async function insertComment(c: {
   platform: CommentPlatform;
   commentId: string;
+  account?: string;
+  accountLabel?: string;
   postText: string;
   postUrl: string;
   author: string;
@@ -496,9 +518,9 @@ export async function insertComment(c: {
   await initDb();
   const now = new Date().toISOString();
   const res = await db().execute({
-    sql: `INSERT INTO comments (platform, comment_id, post_text, post_url, author, text, commented_at, reply, category, needs_reply, status, warnings, error, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, '', '', 1, 'draft', '[]', '', ?, ?) RETURNING *`,
-    args: [c.platform, c.commentId, c.postText, c.postUrl, c.author, c.text, c.commentedAt, now, now],
+    sql: `INSERT INTO comments (platform, comment_id, account, account_label, post_text, post_url, author, text, commented_at, reply, category, needs_reply, status, warnings, error, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', 1, 'draft', '[]', '', ?, ?) RETURNING *`,
+    args: [c.platform, c.commentId, c.account ?? '', c.accountLabel ?? '', c.postText, c.postUrl, c.author, c.text, c.commentedAt, now, now],
   });
   return rowToComment(res.rows[0] as Record<string, unknown>);
 }

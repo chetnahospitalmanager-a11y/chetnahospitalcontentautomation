@@ -116,7 +116,7 @@ function socialHighlights(channels: ChannelReport[]): string[] {
     parts.push(`${c.posts.cur} post${c.posts.cur === 1 ? '' : 's'} with ${n(c.engagement.cur)} ${c.channel === 'facebook' ? 'reactions, comments and shares' : 'likes and comments'} (${change(c.engagement)})`);
     out.push(`${c.label}: ${parts.join(', ')}.`);
     if (c.topPost && c.topPost.engagement > 0) out.push(`Best ${c.label} post this week: "${c.topPost.text || '(no caption)'}" (${n(c.topPost.engagement)} ${c.channel === 'facebook' ? 'reactions, comments and shares' : 'likes and comments'}).`);
-    if (c.posts.cur === 0) out.push(`Nothing was posted on ${c.label} this week.`);
+    if (c.posts.cur === 0 && !c.doctor) out.push(`Nothing was posted on ${c.label} this week.`);
   }
   return out;
 }
@@ -243,7 +243,7 @@ async function build(opts: { weekStart?: string; alert?: boolean }): Promise<Rep
   if (opts.alert && config.publicBaseUrl) {
     const parts: string[] = [];
     if (profiles.length) parts.push(`Google ${totals.calls.cur} calls (${change(totals.calls)}), ${totals.directions.cur} directions (${change(totals.directions)})`);
-    for (const c of social) {
+    for (const c of social.filter((x) => !x.doctor)) {
       const views = c.metrics.find((m) => m.key === 'views')?.value;
       if (views) parts.push(`${c.label} ${n(views.cur)} views (${change(views)})`);
     }
