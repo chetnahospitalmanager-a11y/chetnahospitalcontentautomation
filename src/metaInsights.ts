@@ -1,4 +1,6 @@
 import { config, instagramEnabled, metaEnabled } from './config.ts';
+import { loadHospital } from './hospital.ts';
+import { doctorPagesEnabled, getDoctorPages } from './publishers/metaPages.ts';
 import { graph } from './publishers/meta.ts';
 
 // Meta retires insights metrics often (Page "impressions" went in Nov 2025, engagement/follows in June
@@ -28,6 +30,8 @@ export interface TopPost {
 export interface ChannelReport {
   channel: 'facebook' | 'instagram';
   label: string;
+  /** Doctor's name for a doctor's own Page/Instagram; absent for the hospital's. */
+  doctor?: string;
   followers: number | null;
   metrics: ChannelMetric[];
   posts: Pair;
@@ -111,12 +115,27 @@ function firstLine(text: string): string {
 
 // ---------------------------------------------------------------- Facebook Page
 
-async function facebookReport(w: Week): Promise<ChannelReport> {
-  const r: ChannelReport = { channel: 'facebook', label: 'Facebook', followers: null, metrics: [], posts: { cur: 0, prev: 0 }, engagement: { cur: 0, prev: 0 }, topPost: null };
-  const page = config.metaPageId;
+interface FbAccount {
+  pageId: string;
+  token: string;
+  label: string;
+  doctor?: string;
+}
+
+interface IgAccount {
+  igUserId: string;
+  token: string;
+  label: string;
+  doctor?: string;
+}
+
+async function facebookReport(w: Week, acc: FbAccount): Promise<ChannelReport> {
+  const r: ChannelReport = { channel: 'facebook', label: acc.label, doctor: acc.doctor, followers: null, metrics: [], posts: { cur: 0, prev: 0 }, engagement: { cur: 0, prev: 0 }, topPost: null };
+  const page = acc.pageId;
+  const token = acc.token;
 
   try {
-    const info = await graph(page, { fields: 'followers_count,fan_count' }, 'GET');
+    const info = await graph(page, { fields: 'followers_count,fan_count' }, 'GET', token);
     r.followers = Number(info.followers_count ?? info.fan_count ?? 0) || null;
   } catch (err) {
     r.error = shortError(err);
@@ -126,7 +145,7 @@ async function facebookReport(w: Week): Promise<ChannelReport> {
   const metrics: { key: string; label: string; name: string }[] = [{ key: 'views', label: 'Media views', name: process.env.META_FB_VIEWS_METRIC || 'page_media_view' }];
   for (const m of metrics) {
     try {
-      const json = await graph(`${page}/insights`, { metric: m.name, period: 'day', since: w.prevStart, until: addDays(w.weekEnd, 2) }, 'GET');
+      const json = await graph(`${page}/insights`, { metric: m.name, period: 'day', since: w.prevStart, until: addDays(w.weekEnd, 2) }, 'GET', token);
       const daily = parsePageDaily(json);
       r.metrics.push({ key: m.key, label: m.label, value: { cur: sumRange(daily, w.weekStart, w.weekEnd), prev: sumRange(daily, w.prevStart, w.prevEnd) } });
     } catch (err) {
@@ -147,6 +166,7 @@ async function facebookReport(w: Week): Promise<ChannelReport> {
         limit: '100',
       },
       'GET',
+      token,
     )) as { data?: { created_time: string; message?: string; permalink_url?: string; shares?: { count?: number }; reactions?: { summary?: { total_count?: number } }; comments?: { summary?: { total_count?: number } } }[] };
     for (const p of json.data ?? []) {
       const at = new Date(p.created_time.replace(/\+0000$/, 'Z'));
@@ -168,12 +188,13 @@ async function facebookReport(w: Week): Promise<ChannelReport> {
 
 // ---------------------------------------------------------------- Instagram
 
-async function instagramReport(w: Week): Promise<ChannelReport> {
-  const r: ChannelReport = { channel: 'instagram', label: 'Instagram', followers: null, metrics: [], posts: { cur: 0, prev: 0 }, engagement: { cur: 0, prev: 0 }, topPost: null };
-  const ig = config.metaIgUserId;
+async function instagramReport(w: Week, acc: IgAccount): Promise<ChannelReport> {
+  const r: ChannelReport = { channel: 'instagram', label: acc.label, doctor: acc.doctor, followers: null, metrics: [], posts: { cur: 0, prev: 0 }, engagement: { cur: 0, prev: 0 }, topPost: null };
+  const ig = acc.igUserId;
+  const token = acc.token;
 
   try {
-    const info = await graph(ig, { fields: 'followers_count' }, 'GET');
+    const info = await graph(ig, { fields: 'followers_count' }, 'GET', token);
     r.followers = typeof info.followers_count === 'number' ? info.followers_count : null;
   } catch (err) {
     r.error = shortError(err);
@@ -194,7 +215,7 @@ async function instagramReport(w: Week): Promise<ChannelReport> {
       const get = async (from: Date, to: Date) => {
         const params: Record<string, string> = { metric: m.name, period: 'day', metric_type: 'total_value', since: unix(from), until: unix(to) };
         if (m.breakdown) params.breakdown = m.breakdown;
-        return parseIgTotal(await graph(`${ig}/insights`, params, 'GET'), m.bucket);
+        return parseIgTotal(await graph(`${ig}/insights`, params, 'GET', token), m.bucket);
       };
       r.metrics.push({ key: m.key, label: m.label, value: { cur: await get(curStart, curEnd), prev: await get(prevStart, curStart) } });
     } catch (err) {
@@ -203,7 +224,7 @@ async function instagramReport(w: Week): Promise<ChannelReport> {
   }
 
   try {
-    const json = (await graph(ig + '/media', { fields: 'timestamp,caption,permalink,like_count,comments_count', since: unix(prevStart), until: unix(curEnd), limit: '100' }, 'GET')) as {
+    const json = (await graph(ig + '/media', { fields: 'timestamp,caption,permalink,like_count,comments_count', since: unix(prevStart), until: unix(curEnd), limit: '100' }, 'GET', token)) as {
       data?: { timestamp: string; caption?: string; permalink?: string; like_count?: number; comments_count?: number }[];
     };
     for (const p of json.data ?? []) {
@@ -224,10 +245,38 @@ async function instagramReport(w: Week): Promise<ChannelReport> {
   return r;
 }
 
-/** Facebook and Instagram numbers for the week; empty when Meta isn't connected. */
+/**
+ * Facebook and Instagram numbers for the week: the hospital's accounts, then each doctor's own Page and
+ * Instagram (when META_SYSTEM_USER_TOKEN is set). Empty when Meta isn't connected.
+ */
 export async function socialReport(w: Week): Promise<ChannelReport[]> {
   const out: ChannelReport[] = [];
-  if (metaEnabled()) out.push(await facebookReport(w));
-  if (instagramEnabled()) out.push(await instagramReport(w));
+  if (!metaEnabled()) return out;
+  out.push(await facebookReport(w, { pageId: config.metaPageId, token: config.metaPageAccessToken, label: 'Facebook' }));
+  if (instagramEnabled()) out.push(await instagramReport(w, { igUserId: config.metaIgUserId, token: config.metaPageAccessToken, label: 'Instagram' }));
+  if (!doctorPagesEnabled()) return out;
+  let pages: Awaited<ReturnType<typeof getDoctorPages>>;
+  try {
+    pages = await getDoctorPages();
+  } catch (err) {
+    out.push({
+      channel: 'facebook',
+      label: "Doctors' Pages",
+      doctor: '—',
+      followers: null,
+      metrics: [],
+      posts: { cur: 0, prev: 0 },
+      engagement: { cur: 0, prev: 0 },
+      topPost: null,
+      error: shortError(err),
+    });
+    return out;
+  }
+  for (const d of loadHospital().doctors) {
+    const acc = pages.byDoctor.get(d.slug);
+    if (!acc || !acc.token) continue;
+    out.push(await facebookReport(w, { pageId: acc.pageId, token: acc.token, label: `Facebook — ${d.name}`, doctor: d.name }));
+    if (acc.igUserId) out.push(await instagramReport(w, { igUserId: acc.igUserId, token: acc.token, label: `Instagram — ${d.name}`, doctor: d.name }));
+  }
   return out;
 }
